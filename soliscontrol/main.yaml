@@ -1,0 +1,17 @@
+
+# required values
+battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
+battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with Recommend Charge Current of 37A each) 
+# Also see  https://www.youtube.com/watch?v=h1A80cSOrhA to find battery Dis/Charging Current Limits
+inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
+charge_period: # Octopus Flux Cheap period when energy can be imported from the grid at low rates
+  start: "02:05"
+  end: "04:55" 
+  current: 50 # charge current in amps
+discharge_period: # Octopus Flux Peak period when energy can be exported to the grid at high rates
+  start: "16:05"
+  end: "18:55"
+  current: 50 # discharge current in amps
+
+# optional values
+#api_url: 'https://www.soliscloud.com:13333' # default

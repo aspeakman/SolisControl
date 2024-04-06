@@ -1,0 +1,3 @@
+#defines files to include in the source distribution built by the sdist command
+include soliscontrol/*.py
+include *requirements.txt
