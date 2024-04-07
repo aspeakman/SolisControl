@@ -1,20 +1,22 @@
 # SolisControl
 
-Python controller modules for Solis inverters using the Solis Cloud API. At the moment this can be used for one action
+Includes a Python package 'soliscontrol' which has modules for controlling Solis inverters using the Solis Cloud API. At the moment these can be used for one action
 which is to set the daily charge times (within a cheap rate period) and/or discharge times (within a peak rate period). 
 
 You can enable access and view details of the Solis Cloud v1 API by following [these 
 instructions](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud).
 You will also need to enable Self Use mode and set Time of Use: Optimal Income to Run
-on your inverter - [see](https://www.youtube.com/watch?v=h1A80cSOrhA)
+on your inverter - see <https://www.youtube.com/watch?v=h1A80cSOrhA>
 
 This project is heavily based on [solis_control](https://github.com/stevegal/solis_control) which
 has the only details I could find for the v2 solis control API. 
 
-The project includes a [pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app specifically for use 
+The project also includes a [pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app 'solis_flux_times' specifically for use 
 with the Octopus Flux tariff (for details see below).
 
-## Standalone module configuration
+## Standalone 'soliscontrol' package 
+
+### Configuration
 Configuration is via `main.yaml` - an example as follows:
 ```
 battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
@@ -40,7 +42,7 @@ password: "xxxx"
 station_id: "xxxx"
 ```
 
-## Standalone module actions
+### Actions
 To get help:
 
 > python solis_control_req_mod.py -h
@@ -51,15 +53,18 @@ To get inverter status information:
 
 To set inverter charge and discharge times to one hour per day:
 
-> python solis_control_req_mod.py -s 60 60
+> python solis_control_req_mod.py 60 60
 
 
-## Pyscript installation
-You will need to install the [Forecast.Solar integration](https://www.home-assistant.io/integrations/forecast_solar/)
-Copy 'solis_flux_times.py' to the pyscript 'apps' folder
-Copy 'solis_common.py' and 'solis_control_req_mod.py' to the pyscript 'modules' folder
+## Home Assistant Pyscript app 'solis_flux_times'
 
-In the config.py a key parameter is 'morning_requirement' which is the target energy reserve you want to
+## Description
+
+The app sets charge times just before the start of the ...
+
+The settings aim based on the predicted solar yield and the existing battery charge level
+
+In the config.yaml a key parameter is 'morning_requirement' which is the target energy reserve you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for the rest
 the day and the battery energy stored after charging.
 
@@ -68,7 +73,13 @@ have in place after your evening peak rate. The 'reserve' consists of the predic
 the day and the battery energy remaining after discharging. Set this to zero if you don't want any discharging
 to take place.
 
-## Pyscript configuration
+
+### Installation
+First install the [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) integration.
+Next copy 'solis_flux_times.py' to the pyscript 'apps' folder
+and copy 'solis_common.py' and 'solis_control_req_mod.py' to the pyscript 'modules' folder
+
+### Configuration
 Configuration is via the pyscript 'config.yaml' - an example as follows:
 ```
 allow_all_imports: true
@@ -98,7 +109,6 @@ apps:
         start: "16:05"
         end: "18:55"
         current: 50 # discharge current setting in amps
-
 ```
 API credentials are held in the pyscript 'secrets.yaml' - replace xxxx in the following example:
 ```
@@ -108,3 +118,12 @@ solis_user_name: "xxxx"
 solis_password: "xxxx"
 solis_station_id: "xxxx"
 ```
+
+### Actions
+
+Look in the logs for entries tagged 'solis_flux_times'. In the example the charge time
+will be set 20 mins before the start of the cheap rate period at 01:45 (and discharge times 
+are set at 15:45).
+
+There is also a 'test_solis_flux_times' pyscript service which allows you set various
+settings and view the results in the log 
