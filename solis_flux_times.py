@@ -56,9 +56,10 @@ def get_forecast(forecast_type=None, save=False):
             state.set(old_forecasts, value=','.join(lf))
     return forecast
 
-def calc_level(required, forecast=None, forecast_type=''):
+def calc_level(required, forecast, forecast_type):
     # if necessary reduce the required energy level by the predicted solar forecast
     level = required - forecast # target energy level in battery to meet requirement
+    level = level if level >= 0.0 else 0.0
     log.info('Energy required %.1fkWh - solar %s forecast %.1fkWh = target %.1fkWh', required, forecast_type, forecast, level)
     return level
 
@@ -83,9 +84,10 @@ def set_discharge_times():
         set_times('discharge', level_adjusted, test=False)
 
 def set_times(action, level_required, test=True):
+    result = None
     if action not in ('charge', 'discharge'):
         log.warning('Invalid action: ' + action)
-        return
+        return result
     with solis_control.get_session() as session:
         config = dict(pyscript.app_config['solis_control'])
         connected = solis_control.connect(config, session)
@@ -110,6 +112,7 @@ def set_times(action, level_required, test=True):
                 log.error(log_err_msg, current_energy, real_soc, log_action, start, end, level_required, result)
         else:
             log.error('Could not connect to Solis API')
+    return result
             
 @service
 def test(action=None, level_required=None, use_forecast=False):
@@ -141,7 +144,7 @@ fields:
             level_required = pyscript.app_config['morning_requirement']
         elif action == "discharge":
             level_required = pyscript.app_config['evening_requirement']
-    if level_required:
+    if level_required is not None:
         if use_forecast:
             if action == "charge":
                 forecast_type = 'morning'
