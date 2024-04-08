@@ -1,23 +1,38 @@
 # SolisControl
 
-Includes a Python package **soliscontrol** which has modules for controlling a Solis inverter using the Solis Cloud API. This
-can be used to set the daily charge times (within a cheap rate period) or discharge times (within a peak rate period). 
-
-You can enable access and view details of the Solis Cloud v1 API by following [these 
-instructions](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud).
-You will also need to enable _Self Use_ mode and set _Time of Use: Optimal Income_ to _Run_
-on your inverter - see <https://www.youtube.com/watch?v=h1A80cSOrhA>
-
-This project is heavily based on [solis_control](https://github.com/stevegal/solis_control) which
-has the only details I could find for the v2 solis control API. 
+Includes a Python package **soliscontrol** which has modules for controlling a Solis inverter using the Solis Cloud API. 
+This can be used to view key inverter parameters and to 
+set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). 
 
 The project also includes a [pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app **solis_flux_times** specifically for use 
 with the Octopus Flux tariff (for details see below).
 
+Note this project is heavily based on [solis_control](https://github.com/stevegal/solis_control) which
+has the only details I could find for the v2 solis control API. 
+
+### Pre-requisites
+
+You should access the Solis Cloud API by following [these 
+instructions](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud).
+Based on the values returned you will need to create a `secrets.yaml` - replace xxxx in the following example:
+```
+solis_key_id: "xxxx"
+solis_key_secret: "xxxx"
+solis_user_name: "xxxx"
+solis_password: "xxxx"
+solis_station_id: "xxxx"
+```
+
+On your inverter you will also need to enable _Self Use_ mode and 
+set _Time of Use: Optimal Income_ to _Run_ - see <https://www.youtube.com/watch?v=h1A80cSOrhA>
+
+
 ## _soliscontrol_ package 
 
 ### Configuration
-Configuration is via `main.yaml` - an example as follows:
+
+Put your `secrets.yaml` in the `soliscontrol` folder then edit `main.yaml` to suit - an example as follows:
+
 ```
 battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
 battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with spec Recommend Charge Current of 37A each)
@@ -33,19 +48,11 @@ discharge_period: # evening peak period when energy can be exported to the grid 
   current: 50 # discharge current setting in amps
 #api_url: = 'https://www.soliscloud.com:13333' # default
 ```
-API credentials are held in `secrets.yaml` - replace xxxx in the following example 
-```
-key_id: "xxxx"
-key_secret: "xxxx"
-user_name: "xxxx"
-password: "xxxx"
-station_id: "xxxx"
-```
 
 ### Actions
 Use the `solis_control_req_mod.py` module. The other modules in the package 
 (`solis_control_req_class.py`, `solis_control_async_mod.py`, `solis_control_async_class.py`) 
-are experimental.
+are experimental. You should save your `secrets.yaml` in the same folder.
 
 To get help:
 
@@ -64,8 +71,9 @@ To set inverter charge and discharge times to one hour per day:
 
 ### Description
 
-The app sets inverter times just before the start of the charge and discharge periods defined in `config.yaml`.
-The duration of the charge or discharge period is based on the predicted solar yield and the existing battery charge level
+The app sets inverter charge and discharge times daily just before the start of the charge and discharge periods defined in `config.yaml`.
+The duration of the charge or discharge period is based on the predicted solar yield and the 
+existing battery charge level.
 
 _morning_requirement_ is the target energy reserve you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
@@ -73,14 +81,15 @@ the rest of the day and the battery energy stored after charging.
 
 _evening_requirement_ is the target energy reserve you want to
 have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
-the day and the battery energy remaining after discharging. Set this to zero if you don't want any discharging
-to take place.
+the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
+to take place**.
 
 
 ### Installation
 First install the [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) integration.
 Next copy `solis_flux_times.py` to the pyscript _apps_ folder
-and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder
+and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder. Finally append 
+the contents of your `secrets.yaml` to the pyscript `secrets.yaml`.
 
 ### Configuration
 Configuration is via the pyscript `config.yaml` - an example as follows:
@@ -113,20 +122,12 @@ apps:
         end: "18:55"
         current: 50 # discharge current setting in amps
 ```
-API credentials are held in the pyscript `secrets.yaml' - replace xxxx in the following example:
-```
-solis_key_id: "xxxx"
-solis_key_secret: "xxxx"
-solis_user_name: "xxxx"
-solis_password: "xxxx"
-solis_station_id: "xxxx"
-```
 
 ### Actions
 
 Look in the logs for entries tagged _solis_flux_times_. In the example the charge time
-will be set 20 mins before the start of the morning cheap rate period at 01:45 and the discharge time
-will be set 20 mins before the start of the peak evening rate period at 15:45.
+will be set _cron_before_ ie 20 mins before the start of the morning cheap rate period at 01:45 and the discharge time
+will be set _cron_before_ ie 20 mins before the start of the peak evening rate period at 15:45.
 
 There is also a _test_solis_ pyscript service which allows you test different 
-settings and view the results in the log 
+settings and view the results in the log (without taking any action).
