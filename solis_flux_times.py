@@ -115,13 +115,13 @@ def set_times(action, level_required, test=True):
     return result
             
 @service
-def test(action=None, level_required=None, use_forecast=False):
+def test_solis(action=None, level_required=None, use_forecast=False):
     """yaml
 name: Test service
-description: Tests connection to the Solis API and calculates what the charge and discharge times would be set
+description: Tests connection to the Solis API, calculates charge/discharge times and logs results
 fields:
   action:
-     description: set either charge (morning/cheap) or discharge (evening/peak) times
+     description: log either charge (morning/cheap) or discharge (evening/peak) times
      example: charge
      required: true
      selector:
@@ -130,12 +130,12 @@ fields:
            - charge
            - discharge
   level_required:
-     description: target energy level (kWh) available for use after charge or discharge period - if not specified uses the morning/evening_requirement values in the configuration
+     description: target energy level (kWh) available after charge or discharge period (default = 'morning_requirement'/'evening_requirement' values in config.yaml)
      example: 5.0
      required: false
   use_forecast:
      description: whether to subtract the solar forecast remaining today from the level_required value
-     example: true
+     example: false
      required: false
      default: false
 """
