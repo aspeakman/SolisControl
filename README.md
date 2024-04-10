@@ -2,7 +2,8 @@
 
 Includes a Python package **soliscontrol** which has modules for controlling a Solis inverter using the Solis Cloud API. 
 This can be used to view key inverter parameters and to 
-set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). 
+set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). It will also
+check that times are synchronised with the inverter and that charge currents do not exceed the configured maxima.
 
 The project also includes **solis_flux_times** a [pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app specifically for use 
 with the [Octopus Flux](https://octopus.energy/smart/flux/) tariff (for details see below).
@@ -71,19 +72,26 @@ To set inverter charge and discharge times to one hour per day:
 
 ### Description
 
-The app sets inverter charge and discharge times daily just before the start of the charge and discharge periods defined in `config.yaml`.
-The duration of the charge or discharge period is based on the predicted solar yield, the 
-existing battery charge level and the _requirement_ values set in the configuration (see below).
+The app sets inverter charge and discharge times daily just before the start of the Octopus Flux 
+cheap and peak rate periods (defined in the configuration - see below).
+The duration of each charge or discharge episode takes into account the solar forecast and the 
+current battery charge level. 
 
-_morning_requirement_ is the target energy 'reserve' you want to
+Yous should work out the following values depending on your household usage.
+
+* _morning_requirement_ 
+is the target energy 'reserve' you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
 the rest of the day and the battery energy stored after charging.
 
-_evening_requirement_ is the target energy 'reserve' you want to
+* _evening_requirement_ 
+is the target energy 'reserve' you want to
 have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
 the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
 to take place**.
 
+You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
+ _forecast_uplift_ multipication factor in the configuration).
 
 ### Installation
 First install the [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) integration.
@@ -102,6 +110,7 @@ apps:
     morning_requirement: 11 # target kWh level (solar predicted + battery stored) at morning charge period
     evening_requirement: 4 # target kWh level (solar predicted + battery stored) at evening discharge period
     cron_before: 20 # minutes before start of periods below to set charging/discharging times
+	forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
     solis_control:
       key_secret: !secret solis_key_secret
       key_id: !secret solis_key_id
@@ -125,8 +134,8 @@ apps:
 
 ### Actions
 
-Look in the logs for entries tagged _solis_flux_times_. In the example the charge time
-will be set _cron_before_ ie 20 mins before the start of the morning cheap rate period at 01:45 and the discharge time
+Look in the logs for entries tagged _solis_flux_times_. In the example the charge times
+will be set _cron_before_ ie 20 mins before the start of the morning cheap rate period at 01:45 and the discharge times
 will be set _cron_before_ ie 20 mins before the start of the peak evening rate period at 15:45.
 
 There is also a _test_solis_ pyscript service which allows you test different 
