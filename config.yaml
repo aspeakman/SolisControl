@@ -6,6 +6,7 @@ apps:
     morning_requirement: 12.0 # target kWh level for rest of the day (solar predicted + battery stored) at morning charge period
     evening_requirement: 5.0 # target kWh level for rest of the day (solar predicted + battery stored) at evening discharge period
     cron_before: 20 # minutes (default 20) before start of periods below to set charging/discharging times based on target levels
+    forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
     solis_control:
       key_secret: !secret solis_key_secret
       key_id: !secret solis_key_id
@@ -20,8 +21,8 @@ apps:
       charge_period: # Octopus Flux Cheap period in morning when energy can be imported from the grid at low rates
         start: "02:05" # HH:MM string
         end: "04:55" # HH:MM string
-        current: 50 # in amps
+        current: 50 # charge current setting in amps
       discharge_period: # Octopus Flux Peak period in evening when energy can be exported to the grid at high rates
         start: "16:05" # HH:MM string
         end: "18:55" # HH:MM string
-        current: 50 # in amps
+        current: 50 # discharge current setting in amps

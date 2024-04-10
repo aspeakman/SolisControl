@@ -32,7 +32,7 @@ def pyscript_get(entity_name): # creates persistent pyscript state variable if i
     except NameError:
         state.persist(entity_name, default_value='') # comma separated list of last n_forecasts
         return ''
-
+        
 def get_forecast(forecast_type=None, save=False):
     # get the solar forecast (in kWh) or if not available use average of last n_forecasts
     forecast = sensor_get(pyscript.app_config['forecast_remaining'])
@@ -54,6 +54,8 @@ def get_forecast(forecast_type=None, save=False):
             lf = lf[-n_forecasts:]      # maxlen = n_forecasts
             lf = [ '{:.1f}'.format(f) for f in lf ]
             state.set(old_forecasts, value=','.join(lf))
+    if pyscript.app_config.get('forecast_uplift'):
+        forecast = forecast * pyscript.app_config['forecast_uplift']
     return forecast
 
 def calc_level(required, forecast, forecast_type):
