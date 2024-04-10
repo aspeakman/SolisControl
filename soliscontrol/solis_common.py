@@ -19,6 +19,21 @@ DETAIL_ENDPOINT = '/v1/api/inverterDetail'
 DEFAULT_API_URL = 'https://www.soliscloud.com:13333'
 ENERGY_AMP_HOUR = 0.05 # kWh added to battery for each amp hour charged
 # Based on charging rule = 20A times 1 hour adds 1 kWh of charge – see https://www.youtube.com/watch?v=ps22E30OUEk
+ENTRY_FIELDS = {
+    'id': 'inverter_id',
+    'sn': 'inverter_sn',
+    'stationName': 'station_name',
+}
+DETAIL_FIELDS = {
+    'batteryType': 'battery_type',
+    'batteryCapacitySoc': 'battery_soc',
+    'socDischargeSet': 'battery_ods',
+    'power': 'inverter_power',
+    'eToday': 'energy_today',
+}
+LOGIN_FIELDS = {
+    'token': 'login_token',
+}
 
 class SolisControlException(Exception):
     pass
@@ -108,7 +123,9 @@ def charge_times(config, target_level):
     if energy_gap > (full_energy - current_energy): # the target level is beyond the battery capacity
         energy_gap = full_energy - current_energy # set to max
     charge_minutes = calc_minutes(config['charge_period']['current'], energy_gap)
-    return start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
+    period_end = None if real_soc <= 2.0 else config['charge_period']['end'] 
+    # if low on charge, dont define end of period ie charging starts immediately
+    return start_end_times(config['charge_period']['start'], charge_minutes, period_end)
         
 def discharge_times(config, target_level):
     # calculate battery discharge_start and end values required to reduce to a particular level of available energy (kwH)
@@ -117,7 +134,9 @@ def discharge_times(config, target_level):
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     energy_gap = current_energy - target_level # surplus energy to dump in order to reach target
     discharge_minutes = calc_minutes(config['discharge_period']['current'], energy_gap)
-    return start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
+    period_end = None if real_soc >= 98.0 else config['discharge_period']['end'] 
+    # if high on charge, dont define end of period ie discharging  starts immediately
+    return start_end_times(config['discharge_period']['start'], discharge_minutes, period_end)
 
 def calc_minutes(current, energy_kwh): 
     # calculate minutes required to charge/discharge a particular amount of available energy (kwH)
@@ -151,6 +170,8 @@ def diff_hhmm(shhmm, ehhmm): # find difference in minutes between 2 HH:MM times
     
 def check_time(config, diff_mins=5.0):
     # time at inverter and host must be in sync
+    if not config.get('inverter_datetime'):
+        raise SolisControlException('No timestamp details from connection')
     host = config['host_datetime']
     inv = config['inverter_datetime']
     difference = float(abs((host-inv).total_seconds())) / 60.0
@@ -211,13 +232,22 @@ def check_all(config, diff_mins=5.0):
     if check != 'OK':
         return check
     return 'OK'
+    
+def add_fields(field_map, source, dest):
+    for k, v in field_map.items():
+        if k in source:
+            dest[v] = source[k]
+        if source.get('dataTimestamp'):
+            dest['inverter_datetime'] = datetime.fromtimestamp(float(source['dataTimestamp'])/1000.0)
+            dest['host_datetime'] = datetime.now()
 
 def print_status(config, debug=False):
     print ('ID:', config['inverter_id'])
     print ('SN:', config['inverter_sn'])
     
+    print ('Inverter Power:', config['inverter_power'])
+    print ('Energy Today:', config['energy_today'])
     print ('Inverter HH:MM:', config['inverter_datetime'].strftime('%H:%M'))
-    
     print('Check Time:', check_time(config))
     
     print ('Battery SOC:', config['battery_soc'])

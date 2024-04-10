@@ -1,7 +1,6 @@
 from requests import Session, RequestException
 from http import HTTPStatus
 import logging
-from datetime import datetime
 import yaml
 
 import solis_common as common
@@ -52,10 +51,8 @@ def get_inverter_entry(config, session):
                 result = response.json()
                 if result.get('success') and result.get('data'):
                     for record in result['data']['page']['records']:
-                      if record.get('id') and record.get('sn'):
-                        config['inverter_id'] = record['id']
-                        config['inverter_sn'] = record['sn']
-                        config['station_name'] = record['stationName']
+                      if record.get('stationId', '') == config['station_id']:
+                        common.add_fields(common.ENTRY_FIELDS, record, config)
                         inverter_entry = record
                 else:
                     log.warning('Payload error getting inverter entry: %s %s' % (result.get('code'), result.get('msg')))
@@ -80,16 +77,7 @@ def get_inverter_detail(config, session):
                 result = response.json()
                 if result.get('success') and result.get('data'):
                     record = result['data']
-                    config['battery_type'] = record['batteryType']
-                    config['battery_soc'] = record['batteryCapacitySoc']
-                    config['battery_ods'] = record['socDischargeSet']
-                    #config['battery_discharge_max'] = record['batteryDischargeLimiting'] # does this value change?
-                    config['inverter_power'] = record['power']
-                    #print(record.get('daylight', 'no daylight'))
-                    #print(record.get('daylightSwitch', 'no daylight switch'))
-                    #print(record.get('timeZone', 'no timezone'))
-                    config['inverter_datetime'] = datetime.fromtimestamp(float(record['dataTimestamp'])/1000.0)
-                    config['host_datetime'] = datetime.now()
+                    common.add_fields(common.DETAIL_FIELDS, record, config)
                     inverter_detail = record
                 else:
                     log.warning('Payload error getting inverter detail: %s %s' % (result.get('code'), result.get('msg')))
@@ -110,9 +98,11 @@ def get_login_detail(config, session):
             status = response.status_code
             if status == HTTPStatus.OK:
                 result = response.json()
-                if result.get('success') and result.get('csrfToken'): 
-                    config['login_token'] = result['csrfToken']
-                    login_detail = result
+                if result.get('success') and result.get('data'):
+                    record = result['data']
+                    #config['login_token'] = result['csrfToken'] # alternative
+                    common.add_fields(common.LOGIN_FIELDS, record, config)
+                    login_detail = record
                 else:
                     log.warning('Payload error getting login detail: %s %s' % (result.get('code'), result.get('msg')))
             else:
@@ -147,6 +137,7 @@ def set_inverter_times(config, session, charge_start=None, charge_end=None, disc
     except RequestException as e:
         set_times_msg = 'Request exception setting charging/discharging times: ' + str(e)
     return set_times_msg
+    
 def connect(config, session):
     if not get_inverter_entry(config, session):
         return False
@@ -179,8 +170,7 @@ def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
             if test:
                 result = 'OK'
             else:
-                result = set_inverter_times(config, session, cstart, cend, dstart, dend)
-                
+                result = set_inverter_times(config, session, cstart, cend, dstart, dend)    
             if result == 'OK':
                 action = 'Notional' if test else 'Actual'
                 print (action, 'Charge Times Set:', cstart, cend)

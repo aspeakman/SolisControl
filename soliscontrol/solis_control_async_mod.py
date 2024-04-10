@@ -2,7 +2,7 @@ import asyncio
 from aiohttp import ClientError
 from http import HTTPStatus
 import logging
-from datetime import datetime
+import yaml
 
 import solis_common as common
 
@@ -49,10 +49,8 @@ async def get_inverter_entry(config, session):
                 result = await response.json()
                 if result.get('success') and result.get('data'):
                     for record in result['data']['page']['records']:
-                      if record.get('id') and record.get('sn'):
-                        config['inverter_id'] = record['id']
-                        config['inverter_sn'] = record['sn']
-                        config['station_name'] = record['stationName']
+                      if record.get('stationId', '') == config['station_id']:
+                        common.add_fields(common.ENTRY_FIELDS, record, config)
                         inverter_entry = record
                 else:
                     log.warning('Payload error getting inverter entry: %s %s' % (result.get('code'), result.get('msg')))
@@ -77,16 +75,7 @@ async def get_inverter_detail(config, session):
                 result = await response.json()
                 if result.get('success') and result.get('data'):
                     record = result['data']
-                    config['battery_type'] = record['batteryType']
-                    config['battery_soc'] = record['batteryCapacitySoc']
-                    config['battery_ods'] = record['socDischargeSet']
-                    #config['battery_discharge_max'] = record['batteryDischargeLimiting'] # does this value change?
-                    config['inverter_power'] = record['power']
-                    #print(record.get('daylight', 'no daylight'))
-                    #print(record.get('daylightSwitch', 'no daylight switch'))
-                    #print(record.get('timeZone', 'no timezone'))
-                    config['inverter_datetime'] = datetime.fromtimestamp(float(record['dataTimestamp'])/1000.0)
-                    config['host_datetime'] = datetime.now()
+                    common.add_fields(common.DETAIL_FIELDS, record, config)
                     inverter_detail = record
                 else:
                     log.warning('Payload error getting inverter detail: %s %s' % (result.get('code'), result.get('msg')))
@@ -107,9 +96,11 @@ async def get_login_detail(config, session):
             status = response.status
             if status == HTTPStatus.OK:
                 result = await response.json()
-                if result.get('success') and result.get('csrfToken'): 
-                    config['login_token'] = result['csrfToken']
-                    login_detail = result['data']
+                if result.get('success') and result.get('data'):
+                    record = result['data']
+                    #config['login_token'] = result['csrfToken'] # alternative
+                    common.add_fields(common.LOGIN_FIELDS, record, config)
+                    login_detail = record
                 else:
                     log.warning('Payload error getting login detail: %s %s' % (result.get('code'), result.get('msg')))
             else:
@@ -154,7 +145,7 @@ async def connect(config, session):
         return False
     return True
     
-async def main(action=None, minutes=0, silent=False):
+async def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
     with open('secrets.yaml', 'r') as file:
         secrets = yaml.safe_load(file)
     with open('main.yaml', 'r') as file:
@@ -166,23 +157,22 @@ async def main(action=None, minutes=0, silent=False):
         await connect(config, session)
         
         if not silent:
-            common.print_status(config)
+            common.print_status(config, test)
         
-        if action:
-            if minutes <= 0:
-                result = 'Invalid ' + action + ' minutes ' + str(minutes)
-            elif action == 'charge':
-                start = config['charge_period']['start']
-                end = common.increment_hhmm(start, int(minutes))
-                result = await set_inverter_times(config, session, charge_start = start, charge_end = end)
-            elif action == 'discharge':
-                start = config['discharge_period']['start']
-                end = common.increment_hhmm(start, int(minutes))
-                result = await set_inverter_times(config, session, discharge_start = start, discharge_end = end)
-            else:  
-                result = 'Invalid action ' + action
+        if charge_minutes is not None or discharge_minutes is not None:
+            charge_minutes = charge_minutes if charge_minutes is not None and charge_minutes >= 0 else 0
+            discharge_minutes = discharge_minutes if discharge_minutes is not None and discharge_minutes >= 0 else 0
+            cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
+            dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
+            cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
+            if test:
+                result = 'OK'
+            else:
+                result = await set_inverter_times(config, session, cstart, cend, dstart, dend)    
             if result == 'OK':
-                print (action.capitalize(), 'Times Set:', start, end)
+                action = 'Notional' if test else 'Actual'
+                print (action, 'Charge Times Set:', cstart, cend)
+                print (action, 'Discharge Times Set:', dstart, dend)
             else:
                 print ('Error:', result)
 
@@ -190,16 +180,16 @@ if __name__ == "__main__":
 
     import argparse
     
-    action_choices = [ 'charge', 'discharge' ]
-    parser = argparse.ArgumentParser(description='Status and/or action for the Solis API client',
+    parser = argparse.ArgumentParser(description='Status and/or set charging/discharging times for the Solis API client',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-s", "--silent", help="no status messages are printed out", action='store_true')
-    parser.add_argument("action", help="Action for the Solis API client", choices=action_choices, nargs='?', default=None)
-    parser.add_argument("minutes", help="Duration in minutes for the action", type=int, nargs='?', default=0)
+    parser.add_argument("-t", "--test", help="test mode, no actions are taken", action='store_true')
+    parser.add_argument("charge", help="Charging duration in minutes (zero means no charging)", type=int, nargs='?')
+    parser.add_argument("discharge", help="Discharging duration in minutes for the action (zero means no discharging)", type=int, nargs='?')
     args = parser.parse_args()
 
     loop = asyncio.get_event_loop_policy().get_event_loop()
-    loop.run_until_complete(main(args.action, args.minutes, args.silent))
+    loop.run_until_complete(main(args.charge, args.discharge, args.silent, args.test))
     
         
         
