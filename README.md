@@ -72,17 +72,20 @@ To set inverter charge and discharge times to one hour per day:
 
 ### Description
 
-The app sets inverter charge and discharge times daily just before the start of the Octopus Flux 
-cheap and peak rate periods (defined in the configuration - see below).
+The app sets inverter charge (and discharge) times daily just before the start of the Octopus Flux 
+cheap and peak rate periods.
+It runs a defined number of 
+minutes (_cron_before_) these periods. 
 The duration of each charge or discharge episode takes into account the solar forecast and the 
 current battery charge level. 
 
-Yous should work out the following values depending on your household usage.
+You should work out the following values depending on your household usage:
 
 * _morning_requirement_ 
 is the target energy 'reserve' you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
-the rest of the day and the battery energy stored after charging.
+the rest of the day and the battery energy stored after charging. **Set this to zero if you don't want any charging
+to take place**
 
 * _evening_requirement_ 
 is the target energy 'reserve' you want to
@@ -91,7 +94,7 @@ the day and the battery energy remaining after discharging. **Set this to zero i
 to take place**.
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
- _forecast_uplift_ multipication factor in the configuration).
+ _forecast_uplift_ multiplication factor in the configuration below).
 
 ### Installation
 First install the [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) integration.
@@ -108,9 +111,11 @@ apps:
   solis_flux_times:
     forecast_remaining: 'energy_production_today_remaining' # entity id of solar forecast remaining energy today (kWh) - in 'sensor' domain
     morning_requirement: 11 # target kWh level (solar predicted + battery stored) at morning charge period
+    # zero means morning charging will be actively turned off each day (use a negative number to disable any action in the morning)
     evening_requirement: 4 # target kWh level (solar predicted + battery stored) at evening discharge period
+    # zero means evening discharging will be actively turned off each day (use a negative number to disable any action in the evening)
     cron_before: 20 # minutes before start of periods below to set charging/discharging times
-	forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
+    forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
     solis_control:
       key_secret: !secret solis_key_secret
       key_id: !secret solis_key_id

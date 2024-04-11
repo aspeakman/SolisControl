@@ -14,7 +14,9 @@ charge_start_cron = "%d %d * * *" % (charge_start_time.minute, charge_start_time
 discharge_start_cron = "%d %d * * *" % (discharge_start_time.minute, discharge_start_time.hour)
 n_forecasts = 7 # number of old solar forecasts to store
 log_msg = 'Current energy %.1fkWh (%.0f%%) -> set %s from %s to %s to reach %.1fkWh target'
+log_off_msg = 'Current energy %.1fkWh (%.0f%%) -> set %s off (%s to %s) because %s %.1fkWh target'
 log_err_msg = 'Current energy %.1fkWh (%.0f%%) -> error setting %s from %s to %s to reach %.1fkWh target -> %s'
+log_err_off_msg = 'Current energy %.1fkWh (%.0f%%) -> error setting %s off (%s to %s) because %s %.1fkWh target -> %s'
 
 def sensor_get(entity_name): # sensor must exist
     entity_name = entity_name if entity_name.startswith('sensor.') else 'sensor.' + entity_name
@@ -67,8 +69,10 @@ def calc_level(required, forecast, forecast_type):
 
 @time_trigger("cron(" + charge_start_cron + ")")
 def set_charge_times():
+    required = pyscript.app_config.get('morning_requirement')
+    if required is None or required < 0.0:
+        return
     forecast = get_forecast('morning', save=True)
-    required = pyscript.app_config['morning_requirement']
     level_adjusted = calc_level(required, forecast, 'morning') if forecast else required
     result = set_times('charge', level_adjusted, test=False)
     if result != 'OK':
@@ -77,8 +81,10 @@ def set_charge_times():
             
 @time_trigger("cron(" + discharge_start_cron + ")")
 def set_discharge_times():
+    required = pyscript.app_config.get('evening_requirement')
+    if required is None or required < 0.0:
+        return
     forecast = get_forecast('evening', save=True)
-    required = pyscript.app_config['evening_requirement']
     level_adjusted = calc_level(required, forecast, 'evening') if forecast else required
     result = set_times('discharge', level_adjusted, test=False)
     if result != 'OK':
@@ -90,6 +96,7 @@ def set_times(action, level_required, test=True):
     if action not in ('charge', 'discharge'):
         log.warning('Invalid action: ' + action)
         return result
+    msg_expl = 'already above' if action == 'charge' else 'already below'
     with solis_control.get_session() as session:
         config = dict(pyscript.app_config['solis_control'])
         connected = solis_control.connect(config, session)
@@ -109,9 +116,15 @@ def set_times(action, level_required, test=True):
                     result = solis_control.set_inverter_times(config, session, discharge_start = start, discharge_end = end)
             log_action = 'notional ' + action if test else action
             if result == 'OK':
-                log.info(log_msg, current_energy, real_soc, log_action, start, end, level_required)
+                if start == '00:00':
+                    log.info(log_off_msg, current_energy, real_soc, log_action, start, end, msg_expl, level_required)
+                else:
+                    log.info(log_msg, current_energy, real_soc, log_action, start, end, level_required)
             else:
-                log.error(log_err_msg, current_energy, real_soc, log_action, start, end, level_required, result)
+                if start == '00:00':
+                    log.error(log_err_msg, current_energy, real_soc, log_action, start, end, msg_expl, level_required, result)
+                else:
+                    log.error(log_err_off_msg, current_energy, real_soc, log_action, start, end, level_required, result)
         else:
             log.error('Could not connect to Solis API')
     return result
@@ -141,12 +154,12 @@ fields:
      required: false
      default: false
 """
-    if not level_required:
+    if level_required is None:
         if action == "charge":
             level_required = pyscript.app_config['morning_requirement']
         elif action == "discharge":
-            level_required = pyscript.app_config['evening_requirement']
-    if level_required is not None:
+            level_required = pyscript.app_config.get('evening_requirement')
+    if level_required is not None and level_required >= 0.0:
         if use_forecast:
             if action == "charge":
                 forecast_type = 'morning'
