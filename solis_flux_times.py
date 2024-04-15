@@ -13,10 +13,10 @@ discharge_start_time = common.time_adjust(discharge_start_time, -cron_before) # 
 charge_start_cron = "%d %d * * *" % (charge_start_time.minute, charge_start_time.hour)
 discharge_start_cron = "%d %d * * *" % (discharge_start_time.minute, discharge_start_time.hour)
 n_forecasts = 7 # number of old solar forecasts to store
-log_msg = 'Current energy %.1fkWh (%.0f%%) -> set %s from %s to %s to reach %.1fkWh target'
-log_off_msg = 'Current energy %.1fkWh (%.0f%%) -> set %s off (%s to %s) because %s %.1fkWh target'
-log_err_msg = 'Current energy %.1fkWh (%.0f%%) -> error setting %s from %s to %s to reach %.1fkWh target -> %s'
-log_err_off_msg = 'Current energy %.1fkWh (%.0f%%) -> error setting %s off (%s to %s) because %s %.1fkWh target -> %s'
+log_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s from %s to %s to reach %.1fkWh (%.0f%% SOC) target'
+log_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s off (%s to %s) because %s %.1fkWh (%.0f%% SOC) target'
+log_err_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s from %s to %s to reach %.1fkWh (%.0f%% SOC) target -> %s'
+log_err_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s off (%s to %s) because %s %.1fkWh (%.0f%% SOC) target -> %s'
 
 def sensor_get(entity_name): # sensor must exist
     entity_name = entity_name if entity_name.startswith('sensor.') else 'sensor.' + entity_name
@@ -102,6 +102,8 @@ def set_times(action, level_required, test=True):
         connected = solis_control.connect(config, session)
         if connected:
             unavailable_energy, full_energy, current_energy, real_soc = common.energy_values(config)
+            soc = (current_energy + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # state of battery charge
+            target_soc = (level_required + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # target state of charge
             if action == "charge":
                 start, end = common.charge_times(config, level_required) # discharge times to reach required energy level
                 if test:
@@ -117,14 +119,14 @@ def set_times(action, level_required, test=True):
             log_action = 'notional ' + action if test else action
             if result == 'OK':
                 if start == '00:00':
-                    log.info(log_off_msg, current_energy, real_soc, log_action, start, end, msg_expl, level_required)
+                    log.info(log_off_msg, current_energy, soc, log_action, start, end, msg_expl, level_required, target_soc)
                 else:
-                    log.info(log_msg, current_energy, real_soc, log_action, start, end, level_required)
+                    log.info(log_msg, current_energy, soc, log_action, start, end, level_required, target_soc)
             else:
                 if start == '00:00':
-                    log.error(log_err_msg, current_energy, real_soc, log_action, start, end, msg_expl, level_required, result)
+                    log.error(log_err_msg, current_energy, soc, log_action, start, end, msg_expl, level_required, target_soc, result)
                 else:
-                    log.error(log_err_off_msg, current_energy, real_soc, log_action, start, end, level_required, result)
+                    log.error(log_err_off_msg, current_energy, soc, log_action, start, end, level_required, target_soc, result)
         else:
             log.error('Could not connect to Solis API')
     return result

@@ -109,7 +109,7 @@ def energy_values(config):
     unavailable_energy = config['battery_capacity'] * config['battery_ods'] / 100.0 # battery cannot discharge energy below Over Discharge SOC
     full_energy = config['battery_capacity'] - unavailable_energy # energy available if fully charged
     current_energy = (config['battery_soc'] * config['battery_capacity'] / 100.0) - unavailable_energy # currently available energy
-    real_soc = current_energy / full_energy * 100.0 # real state of charge
+    real_soc = current_energy / full_energy * 100.0 # real state of available charge
     return unavailable_energy, full_energy, current_energy, real_soc
     
 def charge_times(config, target_level):

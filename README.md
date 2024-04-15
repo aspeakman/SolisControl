@@ -90,7 +90,7 @@ to take place**
 * _evening_requirement_ 
 is the target energy 'reserve' you want to
 have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
-the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
+of the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
 to take place**.
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
