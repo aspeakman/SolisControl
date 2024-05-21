@@ -49,6 +49,7 @@ def get_forecast(forecast_type=None, save=False):
         lf = []
     if forecast is None:
         forecast = sum(lf) / len(lf) if lf else 0.0 # use average of old forecasts if current solar power forecast not available
+        log.info('Forecast not available - using %.1fkWh (mean of last %d forecasts)', forecast, len(lf))                                                                                                
     else:
         forecast = float(forecast)
         if save:
@@ -60,11 +61,11 @@ def get_forecast(forecast_type=None, save=False):
         forecast = forecast * pyscript.app_config['forecast_uplift']
     return forecast
 
-def calc_level(required, forecast, forecast_type):
+def calc_level(max_required, forecast, forecast_type, min_required=0.0):
     # if necessary reduce the required energy level by the predicted solar forecast
-    level = required - forecast # target energy level in battery to meet requirement
-    level = level if level >= 0.0 else 0.0
-    log.info('Energy required %.1fkWh - solar %s forecast %.1fkWh = target %.1fkWh', required, forecast_type, forecast, level)
+    level = max_required - forecast if forecast else max_required # target energy level in battery to meet requirement
+    level = level if level >= min_required else min_required
+    log.info('Aim %.1fkWh (min %.1fkWh) - solar %s forecast %.1fkWh => target %.1fkWh', max_required, min_required, forecast_type, forecast, level)
     return level
 
 @time_trigger("cron(" + charge_start_cron + ")")
@@ -72,8 +73,9 @@ def set_charge_times():
     required = pyscript.app_config.get('morning_requirement')
     if required is None or required < 0.0:
         return
+    min_reserve = required * 0.25 # min reserve before sun up
     forecast = get_forecast('morning', save=True)
-    level_adjusted = calc_level(required, forecast, 'morning') if forecast else required
+    level_adjusted = calc_level(required, forecast, 'morning', min_reserve)
     result = set_times('charge', level_adjusted, test=False)
     if result != 'OK':
         task.sleep(5 * 60) # try again once after 5 mins
@@ -84,8 +86,9 @@ def set_discharge_times():
     required = pyscript.app_config.get('evening_requirement')
     if required is None or required < 0.0:
         return
+    min_reserve = required * 0.25 # min reserve after sun down
     forecast = get_forecast('evening', save=True)
-    level_adjusted = calc_level(required, forecast, 'evening') if forecast else required
+    level_adjusted = calc_level(required, forecast, 'evening', min_reserve)
     result = set_times('discharge', level_adjusted, test=False)
     if result != 'OK':
         task.sleep(5 * 60) # try again once after 5 mins
