@@ -97,7 +97,8 @@ def get_login_detail(config, session):
         with make_request(session.post, config['api_url']+common.LOGIN_ENDPOINT, data = body, headers = header) as response:
             status = response.status_code
             if status == HTTPStatus.OK:
-                result = response.json()
+                #result = response.json()
+                result = common.json_strip(response.text) # deals with erroneous trailing commas in dicts
                 if result.get('success') and result.get('data'):
                     record = result['data']
                     #config['login_token'] = result['csrfToken'] # alternative
@@ -170,7 +171,7 @@ def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
             if test:
                 result = 'OK'
             else:
-                result = set_inverter_times(config, session, cstart, cend, dstart, dend)    
+                result = set_inverter_times(config, session, cstart, cend, dstart, dend)
             if result == 'OK':
                 action = 'Notional' if test else 'Actual'
                 print (action, 'Charge Times Set:', cstart, cend)

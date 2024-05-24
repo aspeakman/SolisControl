@@ -4,6 +4,7 @@ import base64
 import json
 from datetime import datetime, timezone, time
 from random import randint
+import re
 
 """ Common module for Solis Cloud API access 
 See https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
@@ -240,6 +241,10 @@ def add_fields(field_map, source, dest):
         if source.get('dataTimestamp'):
             dest['inverter_datetime'] = datetime.fromtimestamp(float(source['dataTimestamp'])/1000.0)
             dest['host_datetime'] = datetime.now()
+            
+def json_strip(response_text): # strip erroneous trailing commas in JSON dicts 
+    json_string = re.sub(r'\s*,(\s*})', r'\1', response_text) 
+    return json.loads(json_string)
 
 def print_status(config, debug=False):
     print ('ID:', config['inverter_id'])
