@@ -17,11 +17,11 @@ You should access the Solis Cloud API by following [these
 instructions](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud).
 Based on the values returned you will need to create a `secrets.yaml` - replace xxxx in the following example:
 ```
-solis_key_id: "xxxx"
-solis_key_secret: "xxxx"
-solis_user_name: "xxxx"
-solis_password: "xxxx"
-solis_station_id: "xxxx"
+key_id: "xxxx"
+key_secret: "xxxx"
+user_name: "xxxx"
+password: "xxxx"
+station_id: "xxxx"
 ```
 
 On your inverter you will also need to enable _Self Use_ mode and 
@@ -99,8 +99,7 @@ You should also monitor the accuracy of solar forecast values for your home (the
 ### Installation
 First install the [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) integration.
 Next copy `solis_flux_times.py` to the pyscript _apps_ folder
-and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder. Finally append 
-the contents of your `secrets.yaml` to the pyscript `secrets.yaml`.
+and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder. 
 
 ### Configuration
 Configuration is via the pyscript `config.yaml` - an example as follows:
@@ -135,6 +134,14 @@ apps:
         start: "16:05"
         end: "18:55"
         current: 50 # discharge current setting in amps
+```
+Based on the settings above you will need to add the following lines to the pyscript `secrets.yaml` replacing xxxx:
+```
+solis_key_id: "xxxx"
+solis_key_secret: "xxxx"
+solis_user_name: "xxxx"
+solis_password: "xxxx"
+solis_station_id: "xxxx"
 ```
 
 ### Actions

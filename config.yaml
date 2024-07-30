@@ -2,7 +2,8 @@ allow_all_imports: true
 hass_is_global: false
 apps:
   solis_flux_times:
-    forecast_remaining: 'energy_production_today_remaining' # entity id of solar forecast remaining energy (kWh) today - in 'sensor' domain
+    # forecast_remaining: 'energy_production_today_remaining' #  entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
+    forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
     morning_requirement: 12.0 # ideal target kWh level for rest of the day (solar predicted + battery stored) at morning charge period
     # zero means morning charging will be actively turned off each day (use a negative number to disable any action in the morning)
     evening_requirement: 5.0 # ideal target kWh level for rest of the day (solar predicted + battery stored) at evening discharge period
