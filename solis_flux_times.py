@@ -2,6 +2,11 @@ from datetime import time
 
 import solis_control_req_mod as solis_control
 import solis_common as common
+try:
+    import solis_s3_logger as logger
+    DATA_LOGGER = True
+except ImportError:
+    DATA_LOGGER = False
 
 cron_before = pyscript.app_config.get('cron_before', 20) # integer
 charge_start_hhmm = pyscript.app_config['solis_control']['charge_period']['start'] # HH:MM string
@@ -93,7 +98,7 @@ def set_discharge_times():
     if result != 'OK':
         task.sleep(5 * 60) # try again once after 5 mins
         set_times('discharge', level_adjusted, test=False)
-
+        
 def set_times(action, level_required, test=True):
     result = None
     if action not in ('charge', 'discharge'):
@@ -102,6 +107,8 @@ def set_times(action, level_required, test=True):
     msg_expl = 'already above' if action == 'charge' else 'already below'
     with solis_control.get_session() as session:
         config = dict(pyscript.app_config['solis_control'])
+        if DATA_LOGGER and config.get('s3_ip') and config.get('s3_password'):
+            logger.check_logger(config, session) # check if data logger is connected to Solis servers - if not restart it
         connected = solis_control.connect(config, session)
         if connected:
             unavailable_energy, full_energy, current_energy, real_soc = common.energy_values(config)
@@ -127,9 +134,9 @@ def set_times(action, level_required, test=True):
                     log.info(log_msg, current_energy, soc, log_action, start, end, level_required, target_soc)
             else:
                 if start == '00:00':
-                    log.error(log_err_msg, current_energy, soc, log_action, start, end, msg_expl, level_required, target_soc, result)
+                    log.error(log_err_off_msg, current_energy, soc, log_action, start, end, msg_expl, level_required, target_soc, result)
                 else:
-                    log.error(log_err_off_msg, current_energy, soc, log_action, start, end, level_required, target_soc, result)
+                    log.error(log_err_msg, current_energy, soc, log_action, start, end, level_required, target_soc, result)
         else:
             log.error('Could not connect to Solis API')
     return result

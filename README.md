@@ -97,9 +97,10 @@ You should also monitor the accuracy of solar forecast values for your home (the
  _forecast_uplift_ multiplication factor in the configuration below).
 
 ### Installation
-First install the [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) integration.
+First install a solar forecast integration either [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
+[Solcast](https://github.com/tabascoz/ha-solcast-solar).
 Next copy `solis_flux_times.py` to the pyscript _apps_ folder
-and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder. 
+and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder (and if necessary `solis_s3_logger.py` see below). 
 
 ### Configuration
 Configuration is via the pyscript `config.yaml` - an example as follows:
@@ -108,7 +109,8 @@ allow_all_imports: true
 hass_is_global: false
 apps:
   solis_flux_times:
-    forecast_remaining: 'energy_production_today_remaining' # entity id of solar forecast remaining energy today (kWh) - in 'sensor' domain
+    # forecast_remaining: 'energy_production_today_remaining' #  entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
+    forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
     morning_requirement: 11 # target kWh level (solar predicted + battery stored) at morning charge period
     # zero means morning charging will be actively turned off each day (use a negative number to disable any action in the morning)
     evening_requirement: 4 # target kWh level (solar predicted + battery stored) at evening discharge period
@@ -134,6 +136,10 @@ apps:
         start: "16:05"
         end: "18:55"
         current: 50 # discharge current setting in amps
+	  #Uncomment these lines if you have an S3 data logger that occasionally disconnects - checks access and if necessart restarts
+	  #s3_username: !secret solis_s3_username
+      #s3_password: !secret solis_s3_password
+      #s3_ip: !secret solis_s3_ip
 ```
 Based on the settings above you will need to add the following lines to the pyscript `secrets.yaml` replacing xxxx:
 ```
@@ -142,6 +148,9 @@ solis_key_secret: "xxxx"
 solis_user_name: "xxxx"
 solis_password: "xxxx"
 solis_station_id: "xxxx"
+#solis_s3_username: "xxxx" # see above
+#solis_s3_password: "xxxx" # see above
+#secret solis_s3_ip: "xxxx" # see above
 ```
 
 ### Actions

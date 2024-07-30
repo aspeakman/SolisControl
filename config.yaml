@@ -29,3 +29,6 @@ apps:
         start: "16:05" # HH:MM string
         end: "18:55" # HH:MM string
         current: 50 # discharge current setting in amps
+      #s3_username: !secret solis_s3_username
+      #s3_password: !secret solis_s3_password
+      #s3_ip: !secret solis_s3_ip
