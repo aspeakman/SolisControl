@@ -113,6 +113,7 @@ def set_times(action, level_required, test=True):
         if connected:
             unavailable_energy, full_energy, current_energy, real_soc = common.energy_values(config)
             soc = (current_energy + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # state of battery charge
+            level_required = full_energy if level_required > full_energy else level_required
             target_soc = (level_required + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # target state of charge
             if action == "charge":
                 start, end = common.charge_times(config, level_required) # discharge times to reach required energy level
