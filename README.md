@@ -39,6 +39,7 @@ battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (e
 battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with spec Recommend Charge Current of 37A each)
   # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
 inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
+random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
 charge_period: # morning cheap period when energy can be imported from the grid at low rates
   start: "02:05"
   end: "04:55" 
@@ -73,11 +74,12 @@ To set inverter charge and discharge times to one hour per day:
 ### Description
 
 The app sets inverter charge (and discharge) times daily just before the start of the Octopus Flux 
-cheap and peak rate periods.
-It runs a defined number of 
-minutes (_cron_before_) these periods. 
-The duration of each charge or discharge episode takes into account the solar forecast and the 
-current battery charge level. 
+cheap and peak rate periods (it runs a defined number of 
+minutes (_cron_before_) these periods). 
+Each charge or discharge episode is restricted to within the appropriate period
+but its duration takes into account the solar forecast and the 
+current battery charge level. You can use the _random_start_ setting to choose whether
+it takes place immediately or at a random point within the charging/discharging period.
 
 You should work out the following values depending on your household usage:
 
@@ -85,13 +87,15 @@ You should work out the following values depending on your household usage:
 is the target energy 'reserve' you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
 the rest of the day and the battery energy stored after charging. **Set this to zero if you don't want any charging
-to take place**
+to take place or to a negative number if you don't want to take any action (for example if you have an existing charging 
+schedule that you want to preserve)**
 
 * _evening_requirement_ 
 is the target energy 'reserve' you want to
 have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
 of the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
-to take place**.
+to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
+schedule that you want to preserve)**.
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
  _forecast_uplift_ multiplication factor in the configuration below).
@@ -128,6 +132,7 @@ apps:
       battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with Recommend Charge Current of 37A each)
           # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
       inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
+	  random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
       charge_period: # Cheap period when energy can be imported from the grid at low rates
         start: "02:05"
         end: "04:55" 

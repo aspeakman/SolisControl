@@ -124,7 +124,8 @@ def charge_times(config, target_level):
     if energy_gap > (full_energy - current_energy): # the target level is beyond the battery capacity
         energy_gap = full_energy - current_energy # set to max
     charge_minutes = calc_minutes(config['charge_period']['current'], energy_gap)
-    period_end = None if real_soc <= 2.0 else config['charge_period']['end'] 
+    random_start = config.get('random_start', True)
+    period_end = None if random_start is False or real_soc <= 2.0 else config['charge_period']['end'] 
     # if low on charge, dont define end of period ie charging starts immediately
     return start_end_times(config['charge_period']['start'], charge_minutes, period_end)
         
@@ -135,7 +136,8 @@ def discharge_times(config, target_level):
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     energy_gap = current_energy - target_level # surplus energy to dump in order to reach target
     discharge_minutes = calc_minutes(config['discharge_period']['current'], energy_gap)
-    period_end = None if real_soc >= 98.0 else config['discharge_period']['end'] 
+    random_start = config.get('random_start', True)
+    period_end = None if random_start is False or real_soc >= 98.0 else config['discharge_period']['end'] 
     # if high on charge, dont define end of period ie discharging  starts immediately
     return start_end_times(config['discharge_period']['start'], discharge_minutes, period_end)
 
@@ -262,6 +264,10 @@ def print_status(config, debug=False):
     
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     print ('Available Energy: %.1fkWh (%.0f%% of max %.1fkWh)' % (current_energy, real_soc, full_energy))
+    #soc = (current_energy + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # state of battery charge
+    #print(soc)
+    #target_soc = (1.7 + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # target state of charge
+    #print(target_soc)
     
     print('Check Current:', check_current(config))
     
