@@ -98,7 +98,7 @@ You should also monitor the accuracy of solar forecast values for your home (the
 
 ### Installation
 First install a solar forecast integration either [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
-[Solcast](https://github.com/tabascoz/ha-solcast-solar).
+[Solcast](https://github.com/tabascoz/ha-solcast-solar) (which I have found to be more accurate).
 Next copy `solis_flux_times.py` to the pyscript _apps_ folder
 and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder (and if necessary `solis_s3_logger.py` see below). 
 
@@ -111,10 +111,10 @@ apps:
   solis_flux_times:
     # forecast_remaining: 'energy_production_today_remaining' #  entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
     forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
-    morning_requirement: 11 # target kWh level (solar predicted + battery stored) at morning charge period
-    # zero means morning charging will be actively turned off each day (use a negative number to disable any action in the morning)
-    evening_requirement: 4 # target kWh level (solar predicted + battery stored) at evening discharge period
-    # zero means evening discharging will be actively turned off each day (use a negative number to disable any action in the evening)
+    morning_requirement: 11 # target kWh level (solar predicted + battery stored) after morning charge period
+    # zero means morning charging will be actively turned off each day (a negative number will disable any action in the morning)
+    evening_requirement: 4 # target kWh level (solar predicted + battery stored) after evening discharge period
+    # zero means evening discharging will be actively turned off each day (a negative number will disable any action in the evening)
     cron_before: 20 # minutes before start of periods below to set charging/discharging times
     forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
     solis_control:
@@ -136,7 +136,7 @@ apps:
         start: "16:05"
         end: "18:55"
         current: 50 # discharge current setting in amps
-	  #Uncomment these lines if you have an S3 data logger that occasionally disconnects - checks access and if necessart restarts
+	  #Uncomment these lines if you have an S3 data logger that occasionally disconnects - checks access and if necessart restarts the logger
 	  #s3_username: !secret solis_s3_username
       #s3_password: !secret solis_s3_password
       #s3_ip: !secret solis_s3_ip
