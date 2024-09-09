@@ -115,37 +115,52 @@ def energy_values(config):
     
 def charge_times(config, target_level):
     # calculate battery charge_start and end values required to reach a particular level of available energy (kwH)
-    if target_level <= 0.0: # the target level is invalid
-        return '00:00', '00:00'
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
+    if target_level <= 0.0: # the target level is invalid
+        return '00:00', '00:00', current_energy
     energy_gap = target_level - current_energy # additional energy required to reach target
     if energy_gap <= 0.0: # the target level is already attained or exceeded
-        return '00:00', '00:00'
+        return '00:00', '00:00', current_energy
     if energy_gap > (full_energy - current_energy): # the target level is beyond the battery capacity
         energy_gap = full_energy - current_energy # set to max
     charge_minutes = calc_minutes(config['charge_period']['current'], energy_gap)
+    max_minutes = diff_hhmm(config['charge_period']['start'], config['charge_period']['end'])
+    charge_minutes = charge_minutes if charge_minutes <= max_minutes else max_minutes
     random_start = config.get('random_start', True)
     period_end = None if random_start is False or real_soc <= 2.0 else config['charge_period']['end'] 
     # if low on charge, dont define end of period ie charging starts immediately
-    return start_end_times(config['charge_period']['start'], charge_minutes, period_end)
+    start, end = start_end_times(config['charge_period']['start'], charge_minutes, period_end)
+    energy_after = current_energy + calc_energy_kwh(config['charge_period']['current'], start, end)
+    return start, end, energy_after
         
 def discharge_times(config, target_level):
     # calculate battery discharge_start and end values required to reduce to a particular level of available energy (kwH)
-    if target_level <= 0.0: # the target level is invalid
-        return '00:00', '00:00'
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
+    if target_level <= 0.0: # the target level is invalid
+        return '00:00', '00:00', current_energy
     energy_gap = current_energy - target_level # surplus energy to dump in order to reach target
     discharge_minutes = calc_minutes(config['discharge_period']['current'], energy_gap)
+    max_minutes = diff_hhmm(config['discharge_period']['start'], config['discharge_period']['end'])
+    discharge_minutes = discharge_minutes if discharge_minutes <= max_minutes else max_minutes
     random_start = config.get('random_start', True)
     period_end = None if random_start is False or real_soc >= 98.0 else config['discharge_period']['end'] 
     # if high on charge, dont define end of period ie discharging  starts immediately
-    return start_end_times(config['discharge_period']['start'], discharge_minutes, period_end)
+    start, end = start_end_times(config['discharge_period']['start'], discharge_minutes, period_end)
+    energy_after = current_energy - calc_energy_kwh(config['discharge_period']['current'], start, end)
+    return start, end, energy_after
 
 def calc_minutes(current, energy_kwh): 
     # calculate minutes required to charge/discharge a particular amount of available energy (kwH)
     if energy_kwh <= 0.0:
-        return 0.0
+        return 0
     return int(60.0 * energy_kwh / (current * ENERGY_AMP_HOUR)) # minutes charging/discharging required to reach target
+    
+def calc_energy_kwh(current, start, end): 
+    # calculate amount of energy (kwH) after charging/discharging from start to end times
+    minutes = diff_hhmm(start, end)
+    if minutes <= 0.0:
+        return 0.0
+    return minutes * current * ENERGY_AMP_HOUR / 60.0 
     
 def start_end_times(period_start, minutes, period_end=None): 
     # work out the start, end times and position them within the charge/discharge period
