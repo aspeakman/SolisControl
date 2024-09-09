@@ -37,7 +37,7 @@ Put your `secrets.yaml` in the _soliscontrol_ folder then edit `main.yaml` to su
 ```
 battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
 battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with spec Recommend Charge Current of 37A each)
-  # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
+# Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
 inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
 random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
 charge_period: # morning cheap period when energy can be imported from the grid at low rates
@@ -79,7 +79,7 @@ minutes (_cron_before_) these periods).
 Each charge or discharge episode is restricted to within the appropriate period
 but its duration takes into account the solar forecast and the 
 current battery charge level. You can use the _random_start_ setting to choose whether
-it takes place immediately or at a random point within the charging/discharging period.
+charge/discharge takes place immediately or at a random point within the period.
 
 You should work out the following values depending on your household usage:
 
@@ -130,9 +130,9 @@ apps:
       #api_url: = 'https://www.soliscloud.com:13333' # default
       battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
       battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with Recommend Charge Current of 37A each)
-          # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
+      # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
       inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
-	  random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
+      random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
       charge_period: # Cheap period when energy can be imported from the grid at low rates
         start: "02:05"
         end: "04:55" 
@@ -141,8 +141,8 @@ apps:
         start: "16:05"
         end: "18:55"
         current: 50 # discharge current setting in amps
-	  #Uncomment these lines if you have an S3 data logger that occasionally disconnects - checks access and if necessart restarts the logger
-	  #s3_username: !secret solis_s3_username
+      #Uncomment these lines if you have an S3 data logger that occasionally disconnects - checks access and if necessart restarts the logger
+      #s3_username: !secret solis_s3_username
       #s3_password: !secret solis_s3_password
       #s3_ip: !secret solis_s3_ip
 ```
