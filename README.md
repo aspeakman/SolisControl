@@ -87,15 +87,13 @@ You should work out the following values depending on your household usage:
 is the target energy 'reserve' you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
 the rest of the day and the battery energy stored after charging. **Set this to zero if you don't want any charging
-to take place or to a negative number if you don't want to take any action (for example if you have an existing charging 
-schedule that you want to preserve)**
+to take place**
 
 * _evening_requirement_ 
 is the target energy 'reserve' you want to
 have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
 of the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
-to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
-schedule that you want to preserve)**.
+to take place**.
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
  _forecast_uplift_ multiplication factor in the configuration below).
@@ -113,12 +111,12 @@ allow_all_imports: true
 hass_is_global: false
 apps:
   solis_flux_times:
-    # forecast_remaining: 'energy_production_today_remaining' #  entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
     forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
-    morning_requirement: 11 # target kWh level (solar predicted + battery stored) after morning charge period
-    # zero means morning charging will be actively turned off each day (a negative number will disable any action in the morning)
-    evening_requirement: 4 # target kWh level (solar predicted + battery stored) after evening discharge period
-    # zero means evening discharging will be actively turned off each day (a negative number will disable any action in the evening)
+    # forecast_remaining: 'energy_production_today_remaining' #  alternative entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
+    morning_requirement: 12.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at morning charge period
+    # zero means morning charging will be actively turned off each day
+    evening_requirement: 5.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at evening discharge period
+    # zero means evening discharging will be actively turned off each day
     cron_before: 20 # minutes before start of periods below to set charging/discharging times
     forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
     solis_control:

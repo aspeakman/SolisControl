@@ -22,6 +22,8 @@ log_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s from %s to %s to reach 
 log_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s off (%s to %s) because %s'
 log_err_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s from %s to %s to reach %.1fkWh (%.0f%% SOC) -> %s'
 log_err_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s off (%s to %s) because %s -> %s'
+charge_times_ent = 'pyscript.charge_times'
+discharge_times_ent = 'pyscript.discharge_times'
 
 def sensor_get(entity_name): # sensor must exist
     entity_name = entity_name if entity_name.startswith('sensor.') else 'sensor.' + entity_name
@@ -77,7 +79,7 @@ def calc_level(max_required, forecast, forecast_type, min_required=0.0):
 def set_charge_times():
     required = pyscript.app_config.get('morning_requirement')
     if required is None or required < 0.0:
-        return
+        required = 0.0 # return
     min_reserve = required * 0.25 # min reserve before sun up
     forecast = get_forecast('morning', save=True)
     level_adjusted = calc_level(required, forecast, 'morning', min_reserve)
@@ -90,7 +92,7 @@ def set_charge_times():
 def set_discharge_times():
     required = pyscript.app_config.get('evening_requirement')
     if required is None or required < 0.0:
-        return
+        required = 0.0 # return
     min_reserve = required * 0.25 # min reserve after sun down
     forecast = get_forecast('evening', save=True)
     level_adjusted = calc_level(required, forecast, 'evening', min_reserve)
@@ -131,6 +133,21 @@ def set_times(action, level_required, test=True):
                     result = solis_control.set_inverter_times(config, session, discharge_start = start, discharge_end = end)
             log_action = 'notional ' + action if test else action
             if result == 'OK':
+                if not test:
+                    if action == "charge":
+                        cstart, cend, dstart, dend = common.limit_times(config, charge_start = start, charge_end = end)
+                    elif action == "discharge":
+                        cstart, cend, dstart, dend = common.limit_times(config, discharge_start = start, discharge_end = end)
+                    if pyscript_get(charge_times_ent) is not None:
+                        if cstart == '00:00' and cend == '00:00':
+                            state.set(charge_times_ent, value='Off')
+                        else: 
+                            state.set(charge_times_ent, value=cstart + ' to ' + cend)
+                    if pyscript_get(discharge_times_ent) is not None:
+                        if dstart == '00:00' and dend == '00:00':
+                            state.set(discharge_times_ent, value='Off')
+                        else: 
+                            state.set(discharge_times_ent, value=dstart + ' to ' + dend)
                 if start == '00:00':
                     log.info(log_off_msg, current_energy, soc, log_action, start, end, msg_expl)
                 else:
