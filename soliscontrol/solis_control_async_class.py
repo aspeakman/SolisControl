@@ -8,7 +8,7 @@ import solis_common as common
 """ Client module for Solis Cloud API access via async awaitable class
 See https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
 
-For scant details of v2 control API
+For inspiration and basic details of v2 control API
 See https://github.com/stevegal/solis_control/
                                                                 
 Note should work on Home Assistant pyscript BUT seems to be a problem with imported classes
@@ -41,6 +41,7 @@ class SolisAPIClient:
         self.inverter_entry = None
         self.inverter_detail = None
         self.login_detail = None
+        self.inverter_times = None
             
     # Use the __await__ method to make the class awaitable
     def __await__(self):
@@ -145,7 +146,8 @@ class SolisAPIClient:
         async with self._session.post(self.config['api_url']+common.LOGIN_ENDPOINT, data = body, headers = header) as response:
             status = response.status
             if status == HTTPStatus.OK:
-                result = await response.json()
+                #result = await response.json()
+                result = common.json_strip(await response.text()) # deals with erroneous trailing commas in dicts
                 if result.get('success') and result.get('data'): 
                     record = result['data']
                     #self.config['login_token'] = result['csrfToken'] # alternative
@@ -158,7 +160,23 @@ class SolisAPIClient:
                 err_msg = 'HTTP error getting login token: %d %s' % (status, await response.text())
             raise SolisAPIException(err_msg)
             
+    async def set_inverter_charge_times(self, start=None, end=None):
+        existing = await self.get_inverter_times()
+        if isinstance(existing, dict):
+            return await self.set_inverter_times(charge_start=start, charge_end=end, 
+                discharge_start=existing['discharge_start'], discharge_end=existing['discharge_end'])
+        return 'Cannot get inverter times'
+        
+    async def set_inverter_discharge_times(self, start=None, end=None):
+        existing = await self.get_inverter_times()
+        if isinstance(existing, dict):
+            return await self.set_inverter_times(discharge_start=start, discharge_end=end, 
+                charge_start=existing['charge_start'], charge_end=existing['charge_end'])
+        return 'Cannot get inverter times'
+            
     async def set_inverter_times(self, charge_start=None, charge_end=None, discharge_start=None, discharge_end=None):
+        if not self.login_detail:
+            raise common.SolisControlException('Not logged in')
         check = common.check_all(self.config)
         if check != 'OK':
             return check
@@ -175,7 +193,32 @@ class SolisAPIClient:
                     return 'Payload error setting charging times: %s' % (str(result))
             else:
                 return 'HTTP error setting charging times: %d %s' % (status, await response.text())
-                
+    
+    async def get_inverter_times(self):
+        if not self.login_detail:
+            raise common.SolisControlException('Not logged in')
+        body = common.prepare_read_body(self.config)
+        headers = common.prepare_post_header(self.config, body, common.READ_ENDPOINT)
+        headers['token']= self.login_token
+        async with self._session.post(self.config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
+            status = response.status_code
+            if status == HTTPStatus.OK:
+                result = await response.json()
+                if result.get('code') == '0'  and result.get('data') and result['data'].get('msg'): 
+                    inverter_times = result['data']['msg']
+                    if not inverter_times:
+                        return None
+                    ivt = inverter_times.split(',')
+                    self.inverter_times = { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 
+                        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:] }
+                    return self.inverter_times
+                else:
+                    err_msg = 'Payload error getting charging/discharging times: %s' % (str(result))
+            else:
+                err_msg = 'HTTP error getting charging/discharging times: %d %s' % (status, await response.text())
+            raise SolisAPIException(err_msg)
+        
+        
 # A coroutine function that creates and initializes an instance asynchronously
 async def create_client(config):
     # Create an instance using the constructor
@@ -195,10 +238,16 @@ async def main(charge_minutes=None, discharge_minutes=None, silent=False, test=T
         common.print_status(config, test)
         
     if charge_minutes is not None or discharge_minutes is not None:
-        charge_minutes = charge_minutes if charge_minutes is not None and charge_minutes >= 0 else 0
-        discharge_minutes = discharge_minutes if discharge_minutes is not None and discharge_minutes >= 0 else 0
-        cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
-        dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
+        if charge_minutes is None or discharge_minutes is None:
+            existing = await client.get_inverter_times()
+        if charge_minutes is None: 
+            cstart = existing['charge_start']; cend = existing['charge_end'] 
+        else:
+            cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
+        if discharge_minutes is None: 
+            dstart = existing['discharge_start']; dend = existing['discharge_end'] 
+        else:
+            dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
         cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
         if test:
             result = 'OK'

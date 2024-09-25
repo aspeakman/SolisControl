@@ -15,6 +15,7 @@ See https://github.com/stevegal/solis_control/
     
 LOGIN_ENDPOINT = '/v2/api/login'
 CONTROL_ENDPOINT = '/v2/api/control'
+READ_ENDPOINT = '/v2/api/atRead'
 INVERTER_ENDPOINT = '/v1/api/inverterList'
 DETAIL_ENDPOINT = '/v1/api/inverterDetail'
 DEFAULT_API_URL = 'https://www.soliscloud.com:13333'
@@ -91,6 +92,9 @@ def limit_times(config, charge_start=None, charge_end=None, discharge_start=None
         
 def prepare_control_body(config, charge_start=None, charge_end=None, discharge_start=None, discharge_end=None):
     # set body of API v2 request to change charge and discharge time schedule 
+    # derived from https://github.com/hultenvp/solis-sensor/discussions/246
+    # and https://github.com/stevegal/solis_control
+    # and https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf
     if not config.get('inverter_id'):
         raise SolisControlException('Not connected')
     charge_current = str(config['charge_period']['current'])
@@ -102,6 +106,16 @@ def prepare_control_body(config, charge_start=None, charge_end=None, discharge_s
     body = body+charge_current+","+discharge_current+",00:00,00:00,00:00,00:00"
     body = body+'"}'
     return body % (charge_start, charge_end, discharge_start, discharge_end)
+
+def prepare_read_body(config):
+    # set body of API v2 request to read charge and discharge time schedule 
+    # derived from https://github.com/hultenvp/solis-sensor/discussions/246
+    # and https://github.com/stevegal/solis_control
+    # and https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf
+    if not config.get('inverter_id'):
+        raise SolisControlException('Not connected')
+    body = '{"inverterId":"'+config['inverter_id']+'","cid":"103"}'
+    return body
     
 def energy_values(config):
     # return 4 values representing energy available from the battery

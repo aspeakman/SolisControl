@@ -9,7 +9,7 @@ import solis_common as common
 """ Client module for Solis Cloud API access via aiohttp library and asyncio
 See https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
 
-For scant details of v2 control API
+For inspiration and basic details of v2 control API
 See https://github.com/stevegal/solis_control/
                                                                 
 Note should work on Home Assistant pyscript BUT seems to be a problem with imported classes
@@ -95,7 +95,8 @@ async def get_login_detail(config, session):
         async with session.post(config['api_url']+common.LOGIN_ENDPOINT, data = body, headers = header) as response:
             status = response.status
             if status == HTTPStatus.OK:
-                result = await response.json()
+                #result = await response.json()
+                result = common.json_strip(await response.text()) # deals with erroneous trailing commas in dicts                                                                                         
                 if result.get('success') and result.get('data'):
                     record = result['data']
                     #config['login_token'] = result['csrfToken'] # alternative
@@ -108,14 +109,28 @@ async def get_login_detail(config, session):
     except ClientError as e:
         log.warning('Client error getting login detail: ' + str(e))
     return login_detail
-            
+    
+async def set_inverter_charge_times(config, session, start=None, end=None):
+    existing = await get_inverter_times(config, session)
+    if isinstance(existing, dict):
+        return await set_inverter_times(config, session, charge_start=start, charge_end=end, 
+            discharge_start=existing['discharge_start'], discharge_end=existing['discharge_end'])
+    return 'Cannot get inverter times'
+    
+async def set_inverter_discharge_times(config, session, start=None, end=None):
+    existing = await get_inverter_times(config, session)
+    if isinstance(existing, dict):
+        return await set_inverter_times(config, session, discharge_start=start, discharge_end=end, 
+            charge_start=existing['charge_start'], charge_end=existing['charge_end'])
+    return 'Cannot get inverter times'
+    
 async def set_inverter_times(config, session, charge_start=None, charge_end=None, discharge_start=None, discharge_end=None):
     if not config.get('login_token'):
-        return 'Not logged in'
+        raise common.SolisControlException('Not logged in')
     check = common.check_all(config) # check time sync and current settings
     if check != 'OK':
         return check
-    body = common.control_body(config, charge_start, charge_end, discharge_start, discharge_end)
+    body = common.prepare_control_body(config, charge_start, charge_end, discharge_start, discharge_end)
     headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
     headers['token']= config['login_token']
     if not config.get('api_url'):
@@ -129,12 +144,40 @@ async def set_inverter_times(config, session, charge_start=None, charge_end=None
                 if result.get('code') == '0': 
                     set_times_msg = 'OK'
                 else:
-                    set_times_msg = 'Payload error setting charging times: %s' % (str(result))
+                    set_times_msg = 'Payload error setting charging/discharging times: %s' % (str(result))
             else:
-                set_times_msg = 'HTTP error setting charging times: %d %s' % (status, await response.text())
+                set_times_msg = 'HTTP error setting charging/discharging times: %d %s' % (status, await response.text())
     except ClientError as e:
-        set_times_msg = 'Client error getting login detail: ' + str(e)
+        set_times_msg = 'Client error setting charging/discharging times: ' + str(e)
     return set_times_msg
+    
+async def get_inverter_times(config, session):
+    if not config.get('login_token'):
+        raise common.SolisControlException('Not logged in')
+    body = common.prepare_read_body(config)
+    headers = common.prepare_post_header(config, body, common.READ_ENDPOINT)
+    headers['token']= config['login_token']
+    if not config.get('api_url'):
+        config['api_url'] = common.DEFAULT_API_URL
+    inverter_times = None                    
+    try:
+        async with session.post(config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
+            status = response.status
+            if status == HTTPStatus.OK:
+                result = await response.json()
+                if result.get('code') == '0'  and result.get('data') and result['data'].get('msg'): 
+                    inverter_times = result['data']['msg']
+                else:
+                    log.warning('Payload error getting charging/discharging times: %s' % (str(result)))
+            else:
+                log.warning('HTTP error getting charging/discharging times: %d %s' % (status, await(response.text())))
+    except ClientError as e:
+        log.warning('Client error getting charging/discharging times: ' + str(e))
+    if not inverter_times:
+        return None
+    ivt = inverter_times.split(',')
+    return { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 
+        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:] }
     
 async def connect(config, session):
     if not await get_inverter_entry(config, session):
@@ -160,10 +203,16 @@ async def main(charge_minutes=None, discharge_minutes=None, silent=False, test=T
             common.print_status(config, test)
         
         if charge_minutes is not None or discharge_minutes is not None:
-            charge_minutes = charge_minutes if charge_minutes is not None and charge_minutes >= 0 else 0
-            discharge_minutes = discharge_minutes if discharge_minutes is not None and discharge_minutes >= 0 else 0
-            cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
-            dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
+            if charge_minutes is None or discharge_minutes is None:
+                existing = await get_inverter_times(config, session)
+            if charge_minutes is None: 
+                cstart = existing['charge_start']; cend = existing['charge_end'] 
+            else:
+                cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
+            if discharge_minutes is None: 
+                dstart = existing['discharge_start']; dend = existing['discharge_end'] 
+            else:
+                dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
             cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
             if test:
                 result = 'OK'
