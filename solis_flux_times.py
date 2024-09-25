@@ -22,20 +22,21 @@ log_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s from %s to %s to reach 
 log_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s off (%s to %s) because %s'
 log_err_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s from %s to %s to reach %.1fkWh (%.0f%% SOC) -> %s'
 log_err_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s off (%s to %s) because %s -> %s'
-charge_times_ent = 'pyscript.charge_times'
-discharge_times_ent = 'pyscript.discharge_times'
+charge_times_entity = 'pyscript.charge_times'
+discharge_times_entity = 'pyscript.discharge_times'
+entity_unavailable = ( None, 'unavailable', 'unknown', 'none' )
 
 def sensor_get(entity_name): # sensor must exist
     entity_name = entity_name if entity_name.startswith('sensor.') else 'sensor.' + entity_name
     result = state.get(entity_name)
-    if result in ['unavailable', 'unknown', 'none']:
+    if result in entity_unavailable:
         return None
     return result
         
 def pyscript_get(entity_name): # creates persistent pyscript state variable if it doesn't exist
     try:
         result = state.get(entity_name)
-        if result in ['unavailable', 'unknown', 'none']:
+        if result in entity_unavailable:
             return None
         return result
     except NameError:
@@ -74,12 +75,23 @@ def calc_level(max_required, forecast, forecast_type, min_required=0.0):
     level = level if level >= min_required else min_required
     log.info('Aim %.1fkWh (min %.1fkWh) - solar %s forecast %.1fkWh => target %.1fkWh', max_required, min_required, forecast_type, forecast, level)
     return level
+    
+def find_requirement(config_setting):
+    required = pyscript.app_config.get(config_setting)
+    if required is None:
+        return -1.0 # do nothing
+    if not isinstance(required, str):
+        return required
+    result = state.get(required)
+    if result in entity_unavailable: # includes None
+        return -1.0 # do nothing
+    return float(result)
 
 @time_trigger("cron(" + charge_start_cron + ")")
 def set_charge_times():
-    required = pyscript.app_config.get('morning_requirement')
-    if required is None or required < 0.0:
-        required = 0.0 # return
+    required = find_requirement('morning_requirement')
+    if required < 0.0:
+        return
     min_reserve = required * 0.25 # min reserve before sun up
     forecast = get_forecast('morning', save=True)
     level_adjusted = calc_level(required, forecast, 'morning', min_reserve)
@@ -90,9 +102,9 @@ def set_charge_times():
             
 @time_trigger("cron(" + discharge_start_cron + ")")
 def set_discharge_times():
-    required = pyscript.app_config.get('evening_requirement')
-    if required is None or required < 0.0:
-        required = 0.0 # return
+    required = find_requirement('evening_requirement')
+    if required < 0.0:
+        return
     min_reserve = required * 0.25 # min reserve after sun down
     forecast = get_forecast('evening', save=True)
     level_adjusted = calc_level(required, forecast, 'evening', min_reserve)
@@ -123,31 +135,18 @@ def set_times(action, level_required, test=True):
                 if test:
                     result = common.check_all(config) # check time sync and current settings only
                 else:
-                    result = solis_control.set_inverter_times(config, session, charge_start = start, charge_end = end)
+                    result = solis_control.set_inverter_charge_times(config, session, start, end)
             elif action == "discharge":
                 start, end, energy_after = common.discharge_times(config, level_required) # discharge times to reach ideal energy level
                 after_soc = (energy_after + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # actual target state of charge
                 if test:
                     result = common.check_all(config) # check time sync and current settings only
                 else:
-                    result = solis_control.set_inverter_times(config, session, discharge_start = start, discharge_end = end)
+                    result = solis_control.set_inverter_discharge_times(config, session, start, end)
             log_action = 'notional ' + action if test else action
             if result == 'OK':
                 if not test:
-                    if action == "charge":
-                        cstart, cend, dstart, dend = common.limit_times(config, charge_start = start, charge_end = end)
-                    elif action == "discharge":
-                        cstart, cend, dstart, dend = common.limit_times(config, discharge_start = start, discharge_end = end)
-                    if pyscript_get(charge_times_ent) is not None:
-                        if cstart == '00:00' and cend == '00:00':
-                            state.set(charge_times_ent, value='Off')
-                        else: 
-                            state.set(charge_times_ent, value=cstart + ' to ' + cend)
-                    if pyscript_get(discharge_times_ent) is not None:
-                        if dstart == '00:00' and dend == '00:00':
-                            state.set(discharge_times_ent, value='Off')
-                        else: 
-                            state.set(discharge_times_ent, value=dstart + ' to ' + dend)
+                    set_entities(config, session)
                 if start == '00:00':
                     log.info(log_off_msg, current_energy, soc, log_action, start, end, msg_expl)
                 else:
@@ -160,7 +159,23 @@ def set_times(action, level_required, test=True):
         else:
             log.error('Could not connect to Solis API')
     return result
-            
+    
+def set_entities(config, session):
+    # set entities listing charge/discharge times after successfully setting times
+    existing = solis_control.get_inverter_times(config, session)
+    if existing and pyscript_get(charge_times_entity) is not None:
+        if existing['charge_start'] == '00:00' and existing['charge_end'] == '00:00':
+            state.set(charge_times_entity, value='Off')
+        else: 
+            value = existing['charge_start'] + ' to ' + existing['charge_end']
+            state.set(charge_times_entity, value=value)
+    if existing and pyscript_get(discharge_times_entity) is not None:
+        if existing['discharge_start'] == '00:00' and existing['discharge_end'] == '00:00':
+            state.set(discharge_times_entity, value='Off')
+        else: 
+            value = existing['discharge_start'] + ' to ' + existing['discharge_end']
+            state.set(discharge_times_entity, value=value)
+
 @service
 def test_solis(action=None, level_required=None, use_forecast=False):
     """yaml
@@ -188,10 +203,10 @@ fields:
 """
     if level_required is None:
         if action == "charge":
-            level_required = pyscript.app_config['morning_requirement']
+            level_required = find_requirement['morning_requirement']
         elif action == "discharge":
-            level_required = pyscript.app_config.get('evening_requirement')
-    if level_required is not None and level_required >= 0.0:
+            level_required = find_requirement('evening_requirement')
+    if level_required >= 0.0:
         if use_forecast:
             if action == "charge":
                 forecast_type = 'morning'
