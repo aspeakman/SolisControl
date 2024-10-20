@@ -5,13 +5,13 @@ This can be used to view key inverter parameters and to
 set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). It will also
 check that times are synchronised with the inverter and that charge currents do not exceed the configured maxima.
 
-The project also includes **solis_flux_times** a [pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app specifically for use 
+The project also includes **solis_flux_times** a [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app specifically for use 
 with the [Octopus Flux](https://octopus.energy/smart/flux/) tariff (for details see below).
 
 Note this project is heavily based on [solis_control](https://github.com/stevegal/solis_control) which
 has the best details I could find for using the v2 solis control API. 
 
-### Pre-requisites
+## Pre-requisites
 
 You should access the Solis Cloud API by following [these 
 instructions](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud).
@@ -27,10 +27,11 @@ station_id: "xxxx"
 On your inverter you will also need to enable _Self Use_ mode and 
 set _Time of Use: Optimal Income_ to _Run_ - see <https://www.youtube.com/watch?v=h1A80cSOrhA>
 
+----------
 
-## _soliscontrol_ package 
+# _soliscontrol_ package 
 
-### Configuration
+## Configuration
 
 Put your `secrets.yaml` in the _soliscontrol_ folder then edit `main.yaml` to suit - an example as follows:
 
@@ -51,7 +52,7 @@ discharge_period: # evening peak period when energy can be exported to the grid 
 #api_url: = 'https://www.soliscloud.com:13333' # default
 ```
 
-### Actions
+## Actions
 Use the `solis_control_req_mod.py` module. The other modules in the package 
 (`solis_control_req_class.py`, `solis_control_async_mod.py`, `solis_control_async_class.py`) 
 are experimental. You should save your `secrets.yaml` in the same folder.
@@ -68,10 +69,11 @@ To set inverter charge and discharge times to one hour per day:
 
 > python solis_control_req_mod.py 60 60
 
+----------
 
-## _solis_flux_times_ Home Assistant app 
+# _solis_flux_times_ Home Assistant app 
 
-### Description
+## Description
 
 The app sets inverter charge (and discharge) times daily just before the start of the Octopus Flux 
 cheap and peak rate periods (it runs a defined number of 
@@ -100,13 +102,13 @@ to take place or to a negative number if you don't want to take any action (for 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
  _forecast_uplift_ multiplication factor in the configuration below).
 
-### Installation
+## Installation
 First install a solar forecast integration either [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
 [Solcast](https://github.com/tabascoz/ha-solcast-solar) (which I have found to be more accurate).
-Next copy `solis_flux_times.py` to the pyscript _apps_ folder
+Next install [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/). Now copy `solis_flux_times.py` to the pyscript _apps_ folder
 and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder (and if necessary `solis_s3_logger.py` see below). 
 
-### Configuration
+## Configuration
 Configuration is via the pyscript `config.yaml` - an example as follows:
 ```
 allow_all_imports: true
@@ -160,7 +162,7 @@ solis_station_id: "xxxx"
 #secret solis_s3_ip: "xxxx" # see above
 ```
 
-### Actions
+## Actions
 
 Look in the logs for entries tagged _solis_flux_times_. In the example the charge times
 will be set _cron_before_ ie 20 mins before the start of the morning cheap rate period at 01:45 and the discharge times
