@@ -203,29 +203,33 @@ def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
         
         if not silent:
             common.print_status(config, test)
-        
-        if charge_minutes is not None or discharge_minutes is not None:
-            if charge_minutes is None or discharge_minutes is None:
-                existing = get_inverter_times(config, session)
-            if charge_minutes is None: 
-                cstart = existing['charge_start']; cend = existing['charge_end'] 
-            else:
-                cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
-            if discharge_minutes is None: 
-                dstart = existing['discharge_start']; dend = existing['discharge_end'] 
-            else:
-                dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
-            cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
-            if test:
-                result = 'OK'
-            else:
-                result = set_inverter_times(config, session, cstart, cend, dstart, dend)
-            if result == 'OK':
-                action = 'Notional' if test else 'Actual'
-                print (action, 'Charge Times Set:', cstart, cend)
-                print (action, 'Discharge Times Set:', dstart, dend)
-            else:
-                print ('Error:', result)
+            
+        existing = get_inverter_times(config, session)
+        if existing:
+            if not silent:
+                print ('Current Charge Period: %s - %s' % (existing['charge_start'], existing['charge_end']))
+                print ('Current Discharge Period: %s - %s' % (existing['discharge_start'], existing['discharge_end']))
+
+            if charge_minutes is not None or discharge_minutes is not None:
+                if charge_minutes is None: 
+                    cstart = existing['charge_start']; cend = existing['charge_end'] 
+                else:
+                    cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
+                if discharge_minutes is None: 
+                    dstart = existing['discharge_start']; dend = existing['discharge_end'] 
+                else:
+                    dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
+                cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
+                if test:
+                    result = 'OK'
+                else:
+                    result = set_inverter_times(config, session, cstart, cend, dstart, dend)
+                if result == 'OK':
+                    action = 'Notional' if test else 'Actual'
+                    print (action, 'Charge Times Set:', cstart, cend)
+                    print (action, 'Discharge Times Set:', dstart, dend)
+                else:
+                    print ('Error:', result)
                 
 if __name__ == "__main__":
 
