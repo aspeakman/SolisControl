@@ -9,8 +9,11 @@ The project also includes **solis_flux_times** a [Pyscript](https://hacs-pyscrip
  for use with energy suppliers that offer a cheap rate charging period and a peak rate discharging period
 such as the [Octopus Flux](https://octopus.energy/smart/flux/) tariff (for details see below).
 
-Note this project is heavily based on [solis_control](https://github.com/stevegal/solis_control) which
-has the best details I could find for using the v2 solis control API. 
+Note this project is based on the Solis API docs for 
+[monitoring](https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf)
+and [control](https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf)	
+and on [solis_control](https://github.com/stevegal/solis_control) which
+has the practical details for constructing requests to the Solis API. 
 
 ## Pre-requisites
 
@@ -90,15 +93,15 @@ You should work out the following values depending on your household usage:
 is the target energy 'reserve' you want to
 have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
 the rest of the day and the battery energy stored after charging. **Set this to zero if you don't want any charging
-to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
--schedule that you want to preserve)**
+to take place or to a negative number if you don't want to take any action (for example if you have an existing charging 
+schedule that you want to preserve)**
 
 * _evening_requirement_ 
 is the target energy 'reserve' you want to
 have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
 of the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
 to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
--schedule that you want to preserve)**.
+schedule that you want to preserve)**.
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
  _forecast_uplift_ multiplication factor in the configuration below).
