@@ -193,7 +193,7 @@ class SolisAPIClient:
         body = common.prepare_read_body(self.config)
         headers = common.prepare_post_header(self.config, body, common.READ_ENDPOINT)
         headers['token']= self.login_token
-        with make_request(session.post, config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
+        with make_request(self._session.post, self.config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
             status = response.status_code
             if status == HTTPStatus.OK:
                 result = response.json()
@@ -202,8 +202,8 @@ class SolisAPIClient:
                     if not inverter_times:
                         return None
                     ivt = inverter_times.split(',')
-                    self.inverter_times = { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 
-                        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:] }
+                    self.inverter_times = { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 'charge_amps': ivt[0], 
+                        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:], 'discharge_amps': ivt[1] }
                     return self.inverter_times
                 else:
                     err_msg = 'Payload error getting charging/discharging times: %s' % (str(result))
@@ -228,29 +228,33 @@ def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
     
     if not silent:
         common.print_status(config, test)
-        
-    if charge_minutes is not None or discharge_minutes is not None:
-        if charge_minutes is None or discharge_minutes is None:
-            existing = client.get_inverter_times()
-        if charge_minutes is None: 
-            cstart = existing['charge_start']; cend = existing['charge_end'] 
-        else:
-            cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
-        if discharge_minutes is None: 
-            dstart = existing['discharge_start']; dend = existing['discharge_end'] 
-        else:
-            dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
-        cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
-        if test:
-            result = 'OK'
-        else:
-            result = client.set_inverter_times(cstart, cend, dstart, dend)    
-        if result == 'OK':
-            action = 'Notional' if test else 'Actual'
-            print (action, 'Charge Times Set:', cstart, cend)
-            print (action, 'Discharge Times Set:', dstart, dend)
-        else:
-            print ('Error:', result)
+    
+    existing = client.get_inverter_times()
+    if existing:
+        if not silent:
+            print ('Current Charge Period: %s - %s (%sA)' % (existing['charge_start'], existing['charge_end'], existing['charge_amps']))
+            print ('Current Discharge Period: %s - %s (%sA)' % (existing['discharge_start'], existing['discharge_end'], existing['discharge_amps']))
+
+        if charge_minutes is not None or discharge_minutes is not None:
+            if charge_minutes is None: 
+                cstart = existing['charge_start']; cend = existing['charge_end'] 
+            else:
+                cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
+            if discharge_minutes is None: 
+                dstart = existing['discharge_start']; dend = existing['discharge_end'] 
+            else:
+                dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
+            cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
+            if test:
+                result = 'OK'
+            else:
+                result = client.set_inverter_times(cstart, cend, dstart, dend)    
+            if result == 'OK':
+                action = 'Notional' if test else 'Actual'
+                print (action, 'Charge Times Set:', cstart, cend)
+                print (action, 'Discharge Times Set:', dstart, dend)
+            else:
+                print ('Error:', result)
                 
 if __name__ == "__main__":
 

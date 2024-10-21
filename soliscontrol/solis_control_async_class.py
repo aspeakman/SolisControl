@@ -201,7 +201,7 @@ class SolisAPIClient:
         headers = common.prepare_post_header(self.config, body, common.READ_ENDPOINT)
         headers['token']= self.login_token
         async with self._session.post(self.config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
-            status = response.status_code
+            status = response.status
             if status == HTTPStatus.OK:
                 result = await response.json()
                 if result.get('code') == '0'  and result.get('data') and result['data'].get('msg'): 
@@ -209,8 +209,8 @@ class SolisAPIClient:
                     if not inverter_times:
                         return None
                     ivt = inverter_times.split(',')
-                    self.inverter_times = { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 
-                        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:] }
+                    self.inverter_times = { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 'charge_amps': ivt[0], 
+                        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:], 'discharge_amps': ivt[1] }
                     return self.inverter_times
                 else:
                     err_msg = 'Payload error getting charging/discharging times: %s' % (str(result))
@@ -236,10 +236,14 @@ async def main(charge_minutes=None, discharge_minutes=None, silent=False, test=T
     
     if not silent:
         common.print_status(config, test)
-        
+    
+    existing = await client.get_inverter_times()
+    if existing:
+        if not silent:
+            print ('Current Charge Period: %s - %s (%sA)' % (existing['charge_start'], existing['charge_end'], existing['charge_amps']))
+            print ('Current Discharge Period: %s - %s (%sA)' % (existing['discharge_start'], existing['discharge_end'], existing['discharge_amps']))
+    
     if charge_minutes is not None or discharge_minutes is not None:
-        if charge_minutes is None or discharge_minutes is None:
-            existing = await client.get_inverter_times()
         if charge_minutes is None: 
             cstart = existing['charge_start']; cend = existing['charge_end'] 
         else:

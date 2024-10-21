@@ -178,8 +178,8 @@ def get_inverter_times(config, session):
     if not inverter_times:
         return None
     ivt = inverter_times.split(',')
-    return { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 
-        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:] }
+    return { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 'charge_amps': ivt[0],
+        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:], 'discharge_amps': ivt[1] }
     
 def connect(config, session):
     if not get_inverter_entry(config, session):
@@ -207,8 +207,8 @@ def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
         existing = get_inverter_times(config, session)
         if existing:
             if not silent:
-                print ('Current Charge Period: %s - %s' % (existing['charge_start'], existing['charge_end']))
-                print ('Current Discharge Period: %s - %s' % (existing['discharge_start'], existing['discharge_end']))
+                print ('Current Charge Period: %s - %s (%sA)' % (existing['charge_start'], existing['charge_end'], existing['charge_amps']))
+                print ('Current Discharge Period: %s - %s (%sA)' % (existing['discharge_start'], existing['discharge_end'], existing['discharge_amps']))
 
             if charge_minutes is not None or discharge_minutes is not None:
                 if charge_minutes is None: 
