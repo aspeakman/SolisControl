@@ -5,8 +5,9 @@ This can be used to view key inverter parameters and to
 set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). It will also
 check that times are synchronised with the inverter and that charge currents do not exceed the configured maxima.
 
-The project also includes **solis_flux_times** a [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app specifically for use 
-with the [Octopus Flux](https://octopus.energy/smart/flux/) tariff (for details see below).
+The project also includes **solis_flux_times** a [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app 
+ for use with energy suppliers that offer a cheap rate charging period and a peak rate discharging period
+such as the [Octopus Flux](https://octopus.energy/smart/flux/) tariff (for details see below).
 
 Note this project is heavily based on [solis_control](https://github.com/stevegal/solis_control) which
 has the best details I could find for using the v2 solis control API. 
@@ -29,7 +30,7 @@ set _Time of Use: Optimal Income_ to _Run_ - see <https://www.youtube.com/watch?
 
 ----------
 
-# _soliscontrol_ package 
+# _soliscontrol_ python package 
 
 ## Configuration
 
@@ -71,11 +72,11 @@ To set inverter charge and discharge times to one hour per day:
 
 ----------
 
-# _solis_flux_times_ Home Assistant app 
+# _solis_flux_times_ Home Assistant pyscript app 
 
 ## Description
 
-The app sets inverter charge (and discharge) times daily just before the start of the Octopus Flux 
+The pyscript app sets inverter charge (and discharge) times daily just before the start of the  
 cheap and peak rate periods (it runs a defined number of 
 minutes (_cron_before_) these periods). 
 Each charge or discharge episode is restricted to within the appropriate period
@@ -168,5 +169,5 @@ Look in the logs for entries tagged _solis_flux_times_. In the example the charg
 will be set _cron_before_ ie 20 mins before the start of the morning cheap rate period at 01:45 and the discharge times
 will be set _cron_before_ ie 20 mins before the start of the peak evening rate period at 15:45.
 
-There is also a _test_solis_ pyscript service which allows you test different 
+There is also a _test_solis_ pyscript service which allows you to test different 
 settings and view the results in the log (without taking any action).
