@@ -9,11 +9,11 @@ The project also includes **solis_flux_times** a [Pyscript](https://hacs-pyscrip
  for use with energy suppliers that offer a cheap rate charging period and a peak rate discharging period
 such as the [Octopus Flux](https://octopus.energy/smart/flux/) tariff (for details see below).
 
-Note this project is based on the Solis API docs for 
+This project is based on the Solis API docs for 
 [monitoring](https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf)
 and [control](https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf)	
-and on [solis_control](https://github.com/stevegal/solis_control) which
-has the practical details for constructing requests to the Solis API. 
+(and on the [solis_control](https://github.com/stevegal/solis_control) project which
+has the practical details for constructing requests to the Solis API). 
 
 ## Pre-requisites
 
@@ -109,11 +109,18 @@ You should also monitor the accuracy of solar forecast values for your home (the
 ## Installation
 First install a solar forecast integration either [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
 [Solcast](https://github.com/tabascoz/ha-solcast-solar) (which I have found to be more accurate).
-Next install [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/). Now copy `solis_flux_times.py` to the pyscript _apps_ folder
+
+Next install [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/). 
+Now copy `solis_flux_times.py` to the pyscript _apps_ folder
 and copy `solis_common.py` and `solis_control_req_mod.py` to the pyscript _modules_ folder (and if necessary `solis_s3_logger.py` see below). 
+Finally create `config.yaml` and `secrets.yaml` (see below) in the main pyscript folder.
 
 ## Configuration
-Configuration is via the pyscript `config.yaml` - an example as follows:
+Setup of pyscript is via the HA `configuration.yaml` - an example as follows:
+```
+pyscript: !include pyscript/config.yaml
+```
+Configuration of _solis_flux_times_ is via the pyscript `config.yaml` - an example as follows:
 ```
 allow_all_imports: true
 hass_is_global: false
@@ -163,7 +170,7 @@ solis_password: "xxxx"
 solis_station_id: "xxxx"
 #solis_s3_username: "xxxx" # see above
 #solis_s3_password: "xxxx" # see above
-#secret solis_s3_ip: "xxxx" # see above
+#solis_s3_ip: "xxxx" # see above
 ```
 
 ## Actions
