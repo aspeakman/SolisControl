@@ -6,10 +6,11 @@ from datetime import datetime, timezone, time
 from random import randint
 import re
 
-""" Common module for Solis Cloud API access 
-See https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
+""" Common module for Solis Cloud API access
+See monitoring API https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
+and separate control API https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf
 
-For inspiration and basic details of v2 control API
+For inspiration and basic details of how to configure requests
 See https://github.com/stevegal/solis_control/
 """
     

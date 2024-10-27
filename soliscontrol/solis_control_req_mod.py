@@ -6,9 +6,10 @@ import yaml
 import solis_common as common
 
 """ Client module for Solis Cloud API access via requests library
-See https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
+See monitoring API https://oss.soliscloud.com/templet/SolisCloud%20Platform%20API%20Document%20V2.0.pdf
+and separate control API https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf
 
-For inspiration and basic details of v2 control API
+For inspiration and basic details of how to configure requests
 See https://github.com/stevegal/solis_control/
                                                                 
 Ideally this would capture connection state within a class and use asyncio/aiohttp libraries
@@ -60,6 +61,7 @@ def get_inverter_entry(config, session):
                 log.warning('HTTP error getting inverter entry: %d %s' % (status, response.text))
     except RequestException as e:
         log.warning('Request exception getting inverter entry: ' + str(e))
+    #print(inverter_entry)
     return inverter_entry
         
 def get_inverter_detail(config, session): 
@@ -85,6 +87,7 @@ def get_inverter_detail(config, session):
                 log.warning('HTTP error getting inverter detail: %d %s' % (status, response.text))
     except RequestException as e:
         log.warning('Request exception getting inverter detail: ' + str(e))
+    #print(inverter_detail)
     return inverter_detail
         
 def get_login_detail(config, session): 
