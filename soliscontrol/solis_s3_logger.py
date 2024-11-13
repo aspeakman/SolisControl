@@ -15,6 +15,8 @@ connection state is passed between methods in the config dict
 and requests are wrapped with task.executor
 See https://hacs-pyscript.readthedocs.io/en/latest/index.html"""
 
+#Also see https://www.youtube.com/watch?v=JNnSJZCg39A for manual reboot
+
 DEFAULT_USERNAME = 'admin'
 DEFAULT_PASSWORD = '123456789'
 DEFAULT_IP = '10.10.100.254'
@@ -95,7 +97,7 @@ def get_device_data(config, session):
                     mode = 'STA'
                 device_data['Mode'] = mode
                 device_data['SSID'] = result[7]
-                device_data['Signal_%'] = float(result[8])
+                device_data['Signal_%'] = result[8] # result can be non-numeric ? none?
                 device_data['IP'] = result[9]
                 device_data['MAC'] = result[10]
                 device_data['Connected'] = result[11] == 'Connected' or result[12] == 'Connected'
@@ -123,10 +125,11 @@ def restart(config, session):
 def check_logger(config, session): # does basic check and restart if necessary
     data = get_device_data(config, session)
     if data and data['Connected'] is False:
-        log.info('Solis servers not connected - restarting data logger')
+        log.info('Inverter not connected to logger - restarting data logger')
         restarted = restart(config, session)
         if restarted == 'OK':
-            task.sleep(15)
+            log.info('Restarted OK')
+            sleep(15)
         else:
             log.warning(restarted)
     
