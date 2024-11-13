@@ -91,24 +91,26 @@ the charge/discharge episode is tied to the beginning or end of the period or ta
 You should work out the following two values depending on your household usage:
 
 * _morning_requirement_ 
-> (note you can use more intuitive names for this setting _kwh_after_charge_ or _post_charge_target_ if your provider offers cheap rate charging outside the morning period)
-
 > This is the target energy 'reserve' you want to
 have in place after your cheap rate period. The 'reserve' consists of the predicted solar yield for 
 the rest of the day and the battery energy stored after charging.
+
 > **Set this to zero if you don't want any charging
 to take place or to a negative number if you don't want to take any action (for example if you have an existing charging 
 schedule that you want to preserve)**
 
-* _evening_requirement_ 
-> (note you can use more intuitive names for this setting _kwh_after_discharge_ or _post_discharge_target_ if your provider offers peak rate discharging outside the evening period)
+> (note you can use more intuitive names for this setting _kwh_after_charge_ or _post_charge_target_ if your provider offers cheap rate charging outside the morning period)
 
+* _evening_requirement_ 
 > This is the target energy 'reserve' you want to
-	have in place after your peak rate period. The 'reserve' consists of the predicted solar yield for the rest
-	of the day and the battery energy remaining after discharging. 
+have in place after your peak rate period. The 'reserve' consists of the predicted solar yield for the rest
+of the day and the battery energy remaining after discharging. 
+
 > **Set this to zero if you don't want any discharging
-	to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
-	schedule that you want to preserve)**.
+to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
+schedule that you want to preserve)**.
+
+> (note you can use more intuitive names for this setting _kwh_after_discharge_ or _post_discharge_target_ if your provider offers peak rate discharging outside the evening period)
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
  _forecast_uplift_ multiplication factor in the configuration below).
