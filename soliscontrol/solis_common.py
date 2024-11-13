@@ -59,43 +59,32 @@ def time_diff(stime, etime):
     eminutes = (etime.hour * 60) + etime.minute # end time as minutes from midnight
     return eminutes - sminutes
     
-def limit_times(config, charge_start=None, charge_end=None, discharge_start=None, discharge_end=None):
+def limit_times(config_period, start=None, end=None):
     # limit charging/discharging times so they are always within allowed periods
-    if charge_start == '00:00' and charge_end == '00:00':
+    if start == '00:00' and end == '00:00':
         pass
-    elif not charge_start and not charge_end: 
-        charge_start = '00:00' # default no charging
-        charge_end = '00:00'
+    elif not start and not end: 
+        start = '00:00' # default no charging/discharging
+        end = '00:00'
     else:
-        if not charge_start:
-            charge_start = config['charge_period']['start'] # default use full period for charging
-        elif charge_start < config['charge_period']['start'] or charge_start > config['charge_period']['end']:
-            charge_start = config['charge_period']['start']
-        if not charge_end or charge_end == '00:00':
-            charge_end = config['charge_period']['end'] # default use full period for charging
-        elif charge_end < charge_start or charge_end > config['charge_period']['end']:
-            charge_end = config['charge_period']['end']
-    if discharge_start == '00:00' and discharge_end == '00:00':
-        pass
-    elif not discharge_start and not discharge_end:
-        discharge_start = '00:00' # default no discharging
-        discharge_end = '00:00'
-    else:
-        if not discharge_start:
-            discharge_start = config['discharge_period']['start'] # default use full period for discharging
-        elif discharge_start < config['discharge_period']['start'] or discharge_start > config['discharge_period']['end']:
-            discharge_start = config['discharge_period']['start']
-        if not discharge_end or discharge_end == '00:00':
-            discharge_end = config['discharge_period']['end'] # default use full period for discharging
-        elif discharge_end < discharge_start or discharge_end > config['discharge_period']['end']:
-            discharge_end = config['discharge_period']['end']
-    return charge_start, charge_end, discharge_start, discharge_end
+        if not start:
+            start = config_period['start'] # default use full period for charging/discharging
+        elif start < config_period['start'] or start > config_period['end']:
+            start = config_period['start']
+        if not end or end == '00:00':
+            end = config_period['end'] # default use full period for charging/discharging
+        elif end < start or end > config_period['end']:
+            end = config_period['end']
+    return start, end
         
-def prepare_control_body(config, charge_start=None, charge_end=None, discharge_start=None, discharge_end=None):
+"""def prepare_control_body(config, charge_start=None, charge_end=None, discharge_start=None, discharge_end=None):
     # set body of API v2 request to change charge and discharge time schedule 
     # derived from https://github.com/hultenvp/solis-sensor/discussions/246
     # and https://github.com/stevegal/solis_control
     # and https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf
+    # format of 'value' string is:
+    # charge_current1,discharge_current1,charge_start1,charge_end1,discharge_start1,discharge_end1,
+    # etc for 3 time slots
     if not config.get('inverter_id'):
         raise SolisControlException('Not connected')
     charge_current = str(config['charge_period']['current'])
@@ -106,17 +95,73 @@ def prepare_control_body(config, charge_start=None, charge_end=None, discharge_s
     body = body+charge_current+","+discharge_current+",00:00,00:00,00:00,00:00,"
     body = body+charge_current+","+discharge_current+",00:00,00:00,00:00,00:00"
     body = body+'"}'
-    return body % (charge_start, charge_end, discharge_start, discharge_end)
-
-def prepare_read_body(config):
-    # set body of API v2 request to read charge and discharge time schedule 
+    return body % (charge_start, charge_end, discharge_start, discharge_end)"""
+    
+def prepare_body(config, inverter_data=None):
+    # set body of API v2 request to read or alter charge and discharge time schedule 
     # derived from https://github.com/hultenvp/solis-sensor/discussions/246
     # and https://github.com/stevegal/solis_control
     # and https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf
+    # format of inverter_data is:
+    # charge_current1,discharge_current1,charge_start1,charge_end1,discharge_start1,discharge_end1,
+    # etc for 2 and 3 time slots
     if not config.get('inverter_id'):
         raise SolisControlException('Not connected')
-    body = '{"inverterId":"'+config['inverter_id']+'","cid":"103"}'
-    return body
+    if inverter_data:
+        inverter_data = inverter_data.replace('-', ',')
+        ivt = inverter_data.split(',')
+        if len(ivt) != 18:
+            raise SolisControlException('Bad inverter data: len != 18')
+        return '{"inverterId":"'+config['inverter_id']+'","cid":"103","value":"'+inverter_data+'"}'
+    else:
+        return '{"inverterId":"'+config['inverter_id']+'","cid":"103"}'
+    
+def extract_inverter_params(inverter_data, charge=True, timeslot=0):
+    # get one entry from the full inverter_data string (which has charge/discharge time and amp settings for 3 time slots)
+    # charge should be True for charging, otherwise False for discharging
+    # timeslot can be 0, 1 or 2
+    inverter_data = inverter_data.replace('-', ',')
+    ivt = inverter_data.split(',')
+    if len(ivt) != 18:
+        raise SolisControlException('Bad inverter data: len != 18')
+    if timeslot < 0 or timeslot > 2:
+        raise SolisControlException('Bad time slot: should be 0, 1 or 2')
+    offset = timeslot * 6
+    if charge:
+        return { 'start': ivt[offset+2], 'end': ivt[offset+3], 'amps': ivt[offset+0] }
+    else: # discharge
+        return { 'start': ivt[offset+4], 'end': ivt[offset+5], 'amps': ivt[offset+1] }
+        
+def setup_params(config_period, start, end):
+    # params dict - limit times and add in amps data
+    s, e = limit_times(config_period, start, end)
+    return { 'start': s, 'end': e, 'amps': str(config_period['current']) }
+        
+def update_inverter_data(inverter_data, params, charge=True, timeslot=0):
+    # update one entry in the full inverter_data string (which has charge/discharge time and amp settings for 3 time slots)
+    # note params is a dict with 'start' (HH:MM), 'end' (HH:MM) and optional 'amps' keys
+    # charge should be True for charging, otherwise False for discharging
+    # timeslot can be 0, 1 or 2
+    inverter_data = inverter_data.replace('-', ',')
+    ivt = inverter_data.split(',')
+    if len(ivt) != 18:
+        raise SolisControlException('Bad inverter data: len != 18')
+    if not params or 'start' not in params or 'end' not in params:
+        raise SolisControlException("Bad params: requires 'start' and 'end' keys")
+    if timeslot < 0 or timeslot > 2:
+        raise SolisControlException('Bad time slot: should be 0, 1 or 2')
+    offset = timeslot * 6
+    if charge:
+        ivt[offset+2] = params['start'] 
+        ivt[offset+3] = params['end']  
+        if 'amps' in params:
+            ivt[offset+0] = str(params['amps'])
+    else: # discharge
+        ivt[offset+4] = params['start'] 
+        ivt[offset+5] = params['end']  
+        if 'amps' in params:
+            ivt[offset+1] = str(params['amps'])
+    return ','.join(ivt)
     
 def energy_values(config):
     # return 4 values representing energy available from the battery
@@ -129,7 +174,7 @@ def energy_values(config):
     return unavailable_energy, full_energy, current_energy, real_soc
     
 def charge_times(config, target_level):
-    # calculate battery charge_start and end values required to reach a particular level of available energy (kwH)
+    # calculate battery charge_start and end values required to reach a particular level of available energy (kWH)
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     if target_level <= 0.0: # the target level is invalid
         return '00:00', '00:00', current_energy
@@ -139,33 +184,36 @@ def charge_times(config, target_level):
     if energy_gap > (full_energy - current_energy): # the target level is beyond the battery capacity
         energy_gap = full_energy - current_energy # set to max
     charge_minutes = calc_minutes(config['charge_period']['current'], energy_gap)
-    max_minutes = diff_hhmm(config['charge_period']['start'], config['charge_period']['end'])
-    charge_minutes = charge_minutes if charge_minutes <= max_minutes else max_minutes
-    random_start = config.get('random_start', True)
-    period_end = None if random_start is False or real_soc <= 2.0 else config['charge_period']['end'] 
-    # if low on charge, dont define end of period ie charging starts immediately
-    start, end = start_end_times(config['charge_period']['start'], charge_minutes, period_end)
+    start, end = start_end_from_minutes(config['charge_period'], charge_minutes)
     energy_after = current_energy + calc_energy_kwh(config['charge_period']['current'], start, end)
     return start, end, energy_after
         
 def discharge_times(config, target_level):
-    # calculate battery discharge_start and end values required to reduce to a particular level of available energy (kwH)
+    # calculate battery discharge_start and end values required to reduce to a particular level of available energy (kWH)
     unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     if target_level <= 0.0: # the target level is invalid
         return '00:00', '00:00', current_energy
     energy_gap = current_energy - target_level # surplus energy to dump in order to reach target
     discharge_minutes = calc_minutes(config['discharge_period']['current'], energy_gap)
-    max_minutes = diff_hhmm(config['discharge_period']['start'], config['discharge_period']['end'])
-    discharge_minutes = discharge_minutes if discharge_minutes <= max_minutes else max_minutes
-    random_start = config.get('random_start', True)
-    period_end = None if random_start is False or real_soc >= 98.0 else config['discharge_period']['end'] 
-    # if high on charge, dont define end of period ie discharging  starts immediately
-    start, end = start_end_times(config['discharge_period']['start'], discharge_minutes, period_end)
+    start, end = start_end_from_minutes(config['discharge_period'], discharge_minutes)
     energy_after = current_energy - calc_energy_kwh(config['discharge_period']['current'], start, end)
     return start, end, energy_after
+    
+def start_end_from_minutes(config_period, minutes):
+    # tie episode to begining or end of the period or to position randomly within it
+    max_minutes = diff_hhmm(config_period['start'], config_period['end'])
+    minutes = minutes if minutes <= max_minutes else max_minutes
+    sync = config_period.get('sync', 'none')
+    if sync.lower() == 'start':
+        period_start = config_period['start']; period_end = None
+    elif sync.lower() == 'end':
+        period_start = None; period_end = config_period['end']
+    else:
+        period_start = config_period['start']; period_end = config_period['end']
+    return start_end_times(period_start, minutes, period_end)
 
 def calc_minutes(current, energy_kwh): 
-    # calculate minutes required to charge/discharge a particular amount of available energy (kwH)
+    # calculate minutes required to charge/discharge a particular amount of available energy (kWH)
     if energy_kwh <= 0.0:
         return 0
     return int(60.0 * energy_kwh / (current * ENERGY_AMP_HOUR)) # minutes charging/discharging required to reach target
@@ -181,13 +229,16 @@ def start_end_times(period_start, minutes, period_end=None):
     # work out the start, end times and position them within the charge/discharge period
     if minutes <= 0:
         return '00:00', '00:00'
-    if period_end: # if we know the end, then position randomly within the period
+    if period_start and period_end: # if we know the start and the end, then position randomly within the period
         duration = abs(diff_hhmm(period_start, period_end)) # duration of the charge period
         leftover = duration - minutes # is there any fallow period?
         offset = randint(0, leftover) if leftover > 0 else 0 # offset from the beginning of the charge period
-    else:
-        offset = 0 # otherwise start immediately
-    return increment_hhmm(period_start, offset), increment_hhmm(period_start, offset+minutes)
+        return increment_hhmm(period_start, offset), increment_hhmm(period_start, offset+minutes)
+    elif period_start:
+        return period_start, increment_hhmm(period_start, minutes)
+    elif period_end:
+        return increment_hhmm(period_end, -minutes), period_end
+    return '00:00', '00:00'
     
 def increment_hhmm(hhmm, minutes): # increment / decrement an HH:MM time
     if not minutes:

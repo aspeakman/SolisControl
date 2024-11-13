@@ -44,15 +44,16 @@ battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (e
 battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with spec Recommend Charge Current of 37A each)
 # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
 inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
-random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
-charge_period: # morning cheap period when energy can be imported from the grid at low rates
+charge_period: # Cheap period when energy can be imported from the grid at low rates
   start: "02:05"
   end: "04:55" 
   current: 50 # charge current setting in amps
-discharge_period: # evening peak period when energy can be exported to the grid at high rates
-  start: "16:05"
-  end: "18:55"
+  sync: 'random' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+discharge_period: # Peak period when energy can be exported to the grid at high rates
+  start: "16:05" # set both to "00:00" if no discharging
+  end: "18:55" # set both to "00:00" if no discharging
   current: 50 # discharge current setting in amps
+  sync: 'start' # if 'start', discharging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
 #api_url: = 'https://www.soliscloud.com:13333' # default
 ```
 
@@ -71,7 +72,7 @@ To get inverter status information:
 
 To set inverter charge and discharge times to one hour per day:
 
-> python solis_control_req_mod.py 60 60
+> python solis_control_req_mod.py -c 60 -d 60
 
 ----------
 
@@ -84,24 +85,30 @@ cheap and peak rate periods (it runs a defined number of
 minutes (_cron_before_) these periods). 
 Each charge or discharge episode is restricted to within the appropriate period
 but its duration takes into account the solar forecast and the 
-current battery charge level. You can use the _random_start_ setting to choose whether
-charge/discharge takes place immediately or at a random point within the period.
+current battery charge level. You can use the _sync_ setting of the appropriate period to choose whether
+the charge/discharge episode is tied to the beginning or end of the period or takes place at a random point within it.
 
-You should work out the following values depending on your household usage:
+You should work out the following two values depending on your household usage:
 
 * _morning_requirement_ 
-is the target energy 'reserve' you want to
-have in place after your morning cheap rate. The 'reserve' consists of the predicted solar yield for 
-the rest of the day and the battery energy stored after charging. **Set this to zero if you don't want any charging
+> (note you can use more intuitive names for this setting _kwh_after_charge_ or _post_charge_target_ if your provider offers cheap rate charging outside the morning period)
+
+> This is the target energy 'reserve' you want to
+have in place after your cheap rate period. The 'reserve' consists of the predicted solar yield for 
+the rest of the day and the battery energy stored after charging.
+> **Set this to zero if you don't want any charging
 to take place or to a negative number if you don't want to take any action (for example if you have an existing charging 
 schedule that you want to preserve)**
 
 * _evening_requirement_ 
-is the target energy 'reserve' you want to
-have in place after your evening peak rate. The 'reserve' consists of the predicted solar yield for the rest
-of the day and the battery energy remaining after discharging. **Set this to zero if you don't want any discharging
-to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
-schedule that you want to preserve)**.
+> (note you can use more intuitive names for this setting _kwh_after_discharge_ or _post_discharge_target_ if your provider offers peak rate discharging outside the evening period)
+
+> This is the target energy 'reserve' you want to
+	have in place after your peak rate period. The 'reserve' consists of the predicted solar yield for the rest
+	of the day and the battery energy remaining after discharging. 
+> **Set this to zero if you don't want any discharging
+	to take place or to a negative number if you don't want to take any action (for example if you have an existing discharging 
+	schedule that you want to preserve)**.
 
 You should also monitor the accuracy of solar forecast values for your home (they can be adjusted using the
  _forecast_uplift_ multiplication factor in the configuration below).
@@ -128,14 +135,14 @@ apps:
   solis_flux_times:
     forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
     # forecast_remaining: 'energy_production_today_remaining' #  alternative entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
-    morning_requirement: 12.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at morning charge period
-    # zero means morning charging will be actively turned off each day (a negative number will disable any action in the morning)
-    # can also be the id of an entity which defines this value eg a helper = 'input_number.morning_reserve'
-    evening_requirement: 5.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at evening discharge period
-    # zero means evening discharging will be actively turned off each day (a negative number will disable any action in the evening)
-    # can also be the id of an entity which defines this value eg a helper = 'input_number.evening_reserve'
-    cron_before: 20 # minutes before start of periods below to set charging/discharging times
     forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
+    morning_requirement: 12.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at cheap rate charge period
+    # zero means cheap charging will be actively turned off each day (a negative number will disable any action)
+    # can also be the id of an entity which defines this value eg a helper = 'input_number.morning_reserve'
+    evening_requirement: 5.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at peak rate discharge period
+    # zero means peak discharging will be actively turned off each day (a negative number will disable any action)
+    # can also be the id of an entity which defines this value eg a helper = 'input_number.evening_reserve'
+    cron_before: 20 # minutes before start of periods below to assess forecast and set charging/discharging times
     solis_control:
       key_secret: !secret solis_key_secret
       key_id: !secret solis_key_id
@@ -147,15 +154,16 @@ apps:
       battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with Recommend Charge Current of 37A each)
       # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
       inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
-      random_start: true # charging/discharging starts at a random point within the periods below (if false takes place at the start of the period)
       charge_period: # Cheap period when energy can be imported from the grid at low rates
         start: "02:05"
         end: "04:55" 
         current: 50 # charge current setting in amps
+        sync: 'random' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
       discharge_period: # Peak period when energy can be exported to the grid at high rates
-        start: "16:05"
-        end: "18:55"
+        start: "16:05" # set both to "00:00" if no discharging
+        end: "18:55" # set both to "00:00" if no discharging
         current: 50 # discharge current setting in amps
+        sync: 'random' # if 'start', discharging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
       #Uncomment these lines if you have an S3 data logger that occasionally disconnects - checks access and if necessart restarts the logger
       #s3_username: !secret solis_s3_username
       #s3_password: !secret solis_s3_password
@@ -176,8 +184,8 @@ solis_station_id: "xxxx"
 ## Actions
 
 Look in the logs for entries tagged _solis_flux_times_. In the example the charge times
-will be set _cron_before_ ie 20 mins before the start of the morning cheap rate period at 01:45 and the discharge times
-will be set _cron_before_ ie 20 mins before the start of the peak evening rate period at 15:45.
+will be set _cron_before_ ie 20 mins before the start of the cheap rate period at 01:45 and the discharge times
+will be set _cron_before_ ie 20 mins before the start of the peak rate period at 15:45.
 
 There is also a _test_solis_ pyscript service which allows you to test different 
 settings and view the results in the log (without taking any action).

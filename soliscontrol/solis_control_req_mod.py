@@ -113,9 +113,10 @@ def get_login_detail(config, session):
                 log.warning('HTTP error getting login detail: %d %s' % (status, response.text))
     except RequestException as e:
         log.warning('Request exception getting login detail: ' + str(e))
+    #print(login_detail)
     return login_detail
 
-def set_inverter_charge_times(config, session, start=None, end=None):
+"""def set_inverter_charge_times(config, session, start=None, end=None):
     existing = get_inverter_times(config, session)
     if isinstance(existing, dict):
         return set_inverter_times(config, session, charge_start=start, charge_end=end, 
@@ -154,35 +155,83 @@ def set_inverter_times(config, session, charge_start=None, charge_end=None, disc
                 set_times_msg = 'HTTP error setting charging/discharging times: %d %s' % (status, response.text)
     except RequestException as e:
         set_times_msg = 'Request exception setting charging/discharging times: ' + str(e)
-    return set_times_msg
-    
-def get_inverter_times(config, session):
+    return set_times_msg"""
+
+def set_inverter_params(config, session, params, charge=True, timeslot=0):
+    # note params is a dict with 'start' (HH:MM), 'end' (HH:MM) and optional 'amps' keys
+    # charge should be True for charging, otherwise False for discharging
+    # timeslot can be 0, 1 or 2
     if not config.get('login_token'):
         raise common.SolisControlException('Not logged in')
-    body = common.prepare_read_body(config)
+    check = common.check_all(config) # check time sync and current settings
+    if check != 'OK':
+        return check
+    if not config.get('api_url'):
+        config['api_url'] = common.DEFAULT_API_URL
+    set_times_msg = None                    
+    try:
+        body = common.prepare_body(config)
+        headers = common.prepare_post_header(config, body, common.READ_ENDPOINT)
+        headers['token'] = config['login_token']
+        with make_request(session.post, config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
+            status = response.status_code
+            if status == HTTPStatus.OK:
+                result = response.json()
+                if result.get('code') == '0'  and result.get('data') and result['data'].get('msg'): 
+                    inverter_data = result['data']['msg']
+                else:
+                    set_times_msg = 'Payload error getting charging/discharging times: %s' % (str(result))
+            else:
+                set_times_msg = 'HTTP error getting charging/discharging times: %d %s' % (status, response.text)
+        if set_times_msg is not None:
+            return set_times_msg
+        
+        #print(inverter_data)
+        inverter_data = common.update_inverter_data(inverter_data, params, charge=charge, timeslot=timeslot)
+        #print(inverter_data)
+        
+        body = common.prepare_body(config, inverter_data)
+        headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
+        headers['token'] = config['login_token']
+        with make_request(session.post, config['api_url']+common.CONTROL_ENDPOINT, data = body, headers = headers) as response:
+            status = response.status_code
+            if status == HTTPStatus.OK:
+                result = response.json()
+                if result.get('code') == '0': 
+                    set_times_msg = 'OK'
+                else:
+                    set_times_msg = 'Payload error setting charging/discharging times: %s' % (str(result))
+            else:
+                set_times_msg = 'HTTP error setting charging/discharging times: %d %s' % (status, response.text)
+    except RequestException as e:
+        set_times_msg = 'Request exception setting charging/discharging times: ' + str(e)
+    return set_times_msg
+    
+def get_inverter_data(config, session):
+    if not config.get('login_token'):
+        raise common.SolisControlException('Not logged in')
+    body = common.prepare_body(config)
     headers = common.prepare_post_header(config, body, common.READ_ENDPOINT)
     headers['token']= config['login_token']
     if not config.get('api_url'):
         config['api_url'] = common.DEFAULT_API_URL
-    inverter_times = None                    
+    inverter_data = None                    
     try:
         with make_request(session.post, config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
             status = response.status_code
             if status == HTTPStatus.OK:
                 result = response.json()
                 if result.get('code') == '0'  and result.get('data') and result['data'].get('msg'): 
-                    inverter_times = result['data']['msg']
+                    inverter_data = result['data']['msg']
                 else:
                     log.warning('Payload error getting charging/discharging times: %s' % (str(result)))
             else:
                 log.warning('HTTP error getting charging/discharging times: %d %s' % (status, response.text))
     except RequestException as e:
         log.warning('Request exception getting charging/discharging times: ' + str(e))
-    if not inverter_times:
+    if not inverter_data:
         return None
-    ivt = inverter_times.split(',')
-    return { 'charge_start': ivt[2][:5], 'charge_end': ivt[2][6:], 'charge_amps': ivt[0],
-        'discharge_start': ivt[3][:5], 'discharge_end': ivt[3][6:], 'discharge_amps': ivt[1] }
+    return inverter_data
     
 def connect(config, session):
     if not get_inverter_entry(config, session):
@@ -207,32 +256,39 @@ def main(charge_minutes=None, discharge_minutes=None, silent=False, test=True):
         if not silent:
             common.print_status(config, test)
             
-        existing = get_inverter_times(config, session)
-        if existing:
+        inverter_data = get_inverter_data(config, session)
+        if inverter_data:
             if not silent:
-                print ('Current Charge Period: %s - %s (%sA)' % (existing['charge_start'], existing['charge_end'], existing['charge_amps']))
-                print ('Current Discharge Period: %s - %s (%sA)' % (existing['discharge_start'], existing['discharge_end'], existing['discharge_amps']))
+                existing_c = common.extract_inverter_params(inverter_data, charge=True)
+                print ('Current Charge Times: %s - %s (%sA)' % (existing_c['start'], existing_c['end'], existing_c['amps']))
+                existing_d = common.extract_inverter_params(inverter_data, charge=False)
+                print ('Current Discharge Times: %s - %s (%sA)' % (existing_d['start'], existing_d['end'], existing_d['amps']))
 
-            if charge_minutes is not None or discharge_minutes is not None:
-                if charge_minutes is None: 
-                    cstart = existing['charge_start']; cend = existing['charge_end'] 
-                else:
-                    cstart, cend = common.start_end_times(config['charge_period']['start'], charge_minutes, config['charge_period']['end'])
-                if discharge_minutes is None: 
-                    dstart = existing['discharge_start']; dend = existing['discharge_end'] 
-                else:
-                    dstart, dend = common.start_end_times(config['discharge_period']['start'], discharge_minutes, config['discharge_period']['end'])
-                cstart, cend, dstart, dend = common.limit_times(config, cstart, cend, dstart, dend)
+            action = 'Notional' if test else 'Actual'
+            if charge_minutes is not None:
+                cstart, cend = common.start_end_from_minutes(config['charge_period'], charge_minutes)
+                cstart, cend = common.limit_times(config['charge_period'], cstart, cend)
                 if test:
                     result = 'OK'
                 else:
-                    result = set_inverter_times(config, session, cstart, cend, dstart, dend)
+                    params = { 'start': cstart, 'end': cend, 'amps': str(config['charge_period']['current']) }
+                    result = set_inverter_params(config, session, params, charge=True)
                 if result == 'OK':
-                    action = 'Notional' if test else 'Actual'
-                    print (action, 'Charge Times Set:', cstart, cend)
-                    print (action, 'Discharge Times Set:', dstart, dend)
+                    print (action, 'New Charge Times:', cstart, '-', cend)
                 else:
-                    print ('Error:', result)
+                    print ('Charge Error:', result)
+            if discharge_minutes is not None:
+                dstart, dend = common.start_end_from_minutes(config['discharge_period'], discharge_minutes)
+                dstart, dend = common.limit_times(config['discharge_period'], dstart, dend)
+                if test:
+                    result = 'OK'
+                else:
+                    params = { 'start': dstart, 'end': dend, 'amps': str(config['discharge_period']['current']) }
+                    result = set_inverter_params(config, session, params, charge=False)
+                if result == 'OK':
+                    print (action, 'New Discharge Times:', dstart, '-', dend)
+                else:
+                    print ('Discharge Error:', result)
                 
 if __name__ == "__main__":
 
@@ -242,8 +298,8 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-s", "--silent", help="no status messages are printed out", action='store_true')
     parser.add_argument("-t", "--test", help="test mode, no actions are taken", action='store_true')
-    parser.add_argument("charge", help="Charging duration in minutes (zero means no charging)", type=int, nargs='?')
-    parser.add_argument("discharge", help="Discharging duration in minutes for the action (zero means no discharging)", type=int, nargs='?')
+    parser.add_argument("-c", "--charge", help="Charging duration in minutes (zero means no charging)", type=int)
+    parser.add_argument("-d", "--discharge", help="Discharging duration in minutes for the action (zero means no discharging)", type=int)
     args = parser.parse_args()
 
     main(args.charge, args.discharge, args.silent, args.test)
