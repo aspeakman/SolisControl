@@ -5,13 +5,7 @@ apps:
     forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
     # forecast_remaining: 'energy_production_today_remaining' #  alternative entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
     forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
-    morning_requirement: 12.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at cheap rate charge period
-    # zero means morning charging will be actively turned off each day (a negative number will disable any action)
-    # can also be the id of an entity which defines this eg a helper = 'input_number.morning_reserve'
-    evening_requirement: 5.0 # ideal target kWh level for rest of the day (solar predicted + battery reserve) at peak rate discharge period
-    # zero means evening discharging will be actively turned off each day (a negative number will disable any action)
-    # can also be the id of an entity which defines this eg a helper = 'input_number.evening_reserve'
-    cron_before: 20 # minutes (default 20) before start of periods below to set charging/discharging times based on target levels
+    cron_before: 10 # minutes (default 20) before start of periods below to set charging/discharging times based on target levels
     solis_control:
       key_secret: !secret solis_key_secret
       key_id: !secret solis_key_id
@@ -28,11 +22,23 @@ apps:
         end: "04:55" # HH:MM string
         current: 50 # charge current setting in amps
         sync: 'random' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+        kwh_after: 12.0 # target kWh level for rest of the day (solar predicted + battery reserve) after charge period
+        # zero means charging for this period will be turned off (a negative number will disable any action)
+        # can also be the id of an entity which defines this eg a helper = 'input_number.morning_reserve'
+      charge_period2: # 2nd period when energy can be imported from the grid eg top up to avoid importing during peak period
+        start: "14:30"
+        end: "15:30" 
+        current: 50 # charge current setting in amps
+        sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+        kwh_after: 6.0 # target kWh level (solar predicted + battery stored) after 2nd charge period
       discharge_period: # Octopus Flux Peak period in evening when energy can be exported to the grid at high rates
-        start: "16:05" # HH:MM string
-        end: "18:55" # HH:MM string
+        start: "16:05" # set both to "00:00" if no discharging
+        end: "18:55" # set both to "00:00" if no discharging
         current: 50 # discharge current setting in amps
         sync: 'random' # if 'start', discharging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+        kwh_after: 5.0 # target kWh level (solar predicted + battery reserve) after discharge period
+        # zero means discharging will be turned off (a negative number will disable any action)
+        # can also be the id of an entity which defines this eg a helper = 'input_number.evening_reserve'
       #s3_username: !secret solis_s3_username
       #s3_password: !secret solis_s3_password
       #s3_ip: !secret solis_s3_ip

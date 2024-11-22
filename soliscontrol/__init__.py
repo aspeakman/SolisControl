@@ -1,1 +1,0 @@
-from inspire_ha.inspire_ha import *  # NOQA

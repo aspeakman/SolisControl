@@ -124,14 +124,17 @@ def restart(config, session):
     
 def check_logger(config, session): # does basic check and restart if necessary
     data = get_device_data(config, session)
-    if data and data['Connected'] is False:
-        log.info('Inverter not connected to logger - restarting data logger')
-        restarted = restart(config, session)
-        if restarted == 'OK':
-            log.info('Restarted OK')
-            sleep(15)
+    if data:
+        if data['Connected'] is False:
+            log.info('Inverter not connected to logger - restarting data logger')
+            restarted = restart(config, session)
+            if restarted == 'OK':
+                log.info('Restarted OK')
+                sleep(15)
+            else:
+                log.warning(restarted)
         else:
-            log.warning(restarted)
+            log.info('Inverter connected to logger - OK')
     
 def connect(config, session):
     

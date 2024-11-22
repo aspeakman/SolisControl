@@ -57,7 +57,10 @@ def time_diff(stime, etime):
     # difference in minutes between two times (datetime.time objects)
     sminutes = (stime.hour * 60) + stime.minute # start time as minutes from midnight
     eminutes = (etime.hour * 60) + etime.minute # end time as minutes from midnight
-    return eminutes - sminutes
+    if eminutes >= sminutes:
+        return eminutes - sminutes
+    else:
+        return 24 * 60 - sminutes + eminutes # eg 23:00 to 01:00
     
 def limit_times(config_period, start=None, end=None):
     # limit charging/discharging times so they are always within allowed periods
@@ -111,7 +114,7 @@ def prepare_body(config, inverter_data=None):
         inverter_data = inverter_data.replace('-', ',')
         ivt = inverter_data.split(',')
         if len(ivt) != 18:
-            raise SolisControlException('Bad inverter data: len != 18')
+            raise SolisControlException('Bad inverter data: len != 18 -> %s' % inverter_data)
         return '{"inverterId":"'+config['inverter_id']+'","cid":"103","value":"'+inverter_data+'"}'
     else:
         return '{"inverterId":"'+config['inverter_id']+'","cid":"103"}'
@@ -123,9 +126,9 @@ def extract_inverter_params(inverter_data, charge=True, timeslot=0):
     inverter_data = inverter_data.replace('-', ',')
     ivt = inverter_data.split(',')
     if len(ivt) != 18:
-        raise SolisControlException('Bad inverter data: len != 18')
+        raise SolisControlException('Bad inverter data: len != 18 -> %s' % inverter_data)
     if timeslot < 0 or timeslot > 2:
-        raise SolisControlException('Bad time slot: should be 0, 1 or 2')
+        raise SolisControlException('Bad time slot: should be 0, 1 or 2 -> %d' % timeslot)
     offset = timeslot * 6
     if charge:
         return { 'start': ivt[offset+2], 'end': ivt[offset+3], 'amps': ivt[offset+0] }
@@ -145,11 +148,11 @@ def update_inverter_data(inverter_data, params, charge=True, timeslot=0):
     inverter_data = inverter_data.replace('-', ',')
     ivt = inverter_data.split(',')
     if len(ivt) != 18:
-        raise SolisControlException('Bad inverter data: len != 18')
+        raise SolisControlException('Bad inverter data: len != 18 -> %s' % inverter_data)
     if not params or 'start' not in params or 'end' not in params:
         raise SolisControlException("Bad params: requires 'start' and 'end' keys")
     if timeslot < 0 or timeslot > 2:
-        raise SolisControlException('Bad time slot: should be 0, 1 or 2')
+        raise SolisControlException('Bad time slot: should be 0, 1 or 2 -> %d' % timeslot)
     offset = timeslot * 6
     if charge:
         ivt[offset+2] = params['start'] 
@@ -173,9 +176,8 @@ def energy_values(config):
     real_soc = current_energy / full_energy * 100.0 # real state of available charge
     return unavailable_energy, full_energy, current_energy, real_soc
     
-def charge_times(config, target_level):
+def charge_times(config_period, full_energy, current_energy, target_level):
     # calculate battery charge_start and end values required to reach a particular level of available energy (kWH)
-    unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     if target_level <= 0.0: # the target level is invalid
         return '00:00', '00:00', current_energy
     energy_gap = target_level - current_energy # additional energy required to reach target
@@ -183,20 +185,19 @@ def charge_times(config, target_level):
         return '00:00', '00:00', current_energy
     if energy_gap > (full_energy - current_energy): # the target level is beyond the battery capacity
         energy_gap = full_energy - current_energy # set to max
-    charge_minutes = calc_minutes(config['charge_period']['current'], energy_gap)
-    start, end = start_end_from_minutes(config['charge_period'], charge_minutes)
-    energy_after = current_energy + calc_energy_kwh(config['charge_period']['current'], start, end)
+    charge_minutes = calc_minutes(config_period['current'], energy_gap)
+    start, end = start_end_from_minutes(config_period, charge_minutes)
+    energy_after = current_energy + calc_energy_kwh(config_period['current'], start, end)
     return start, end, energy_after
         
-def discharge_times(config, target_level):
+def discharge_times(config_period, current_energy, target_level):
     # calculate battery discharge_start and end values required to reduce to a particular level of available energy (kWH)
-    unavailable_energy, full_energy, current_energy, real_soc = energy_values(config)
     if target_level <= 0.0: # the target level is invalid
         return '00:00', '00:00', current_energy
     energy_gap = current_energy - target_level # surplus energy to dump in order to reach target
-    discharge_minutes = calc_minutes(config['discharge_period']['current'], energy_gap)
-    start, end = start_end_from_minutes(config['discharge_period'], discharge_minutes)
-    energy_after = current_energy - calc_energy_kwh(config['discharge_period']['current'], start, end)
+    discharge_minutes = calc_minutes(config_period['current'], energy_gap)
+    start, end = start_end_from_minutes(config_period, discharge_minutes)
+    energy_after = current_energy - calc_energy_kwh(config_period['current'], start, end)
     return start, end, energy_after
     
 def start_end_from_minutes(config_period, minutes):
@@ -230,7 +231,7 @@ def start_end_times(period_start, minutes, period_end=None):
     if minutes <= 0:
         return '00:00', '00:00'
     if period_start and period_end: # if we know the start and the end, then position randomly within the period
-        duration = abs(diff_hhmm(period_start, period_end)) # duration of the charge period
+        duration = diff_hhmm(period_start, period_end) # duration of the charge period in mins
         leftover = duration - minutes # is there any fallow period?
         offset = randint(0, leftover) if leftover > 0 else 0 # offset from the beginning of the charge period
         return increment_hhmm(period_start, offset), increment_hhmm(period_start, offset+minutes)
@@ -293,19 +294,38 @@ def check_current(config):
     # current for charging/discharging must be below inverter max and also below battery_max_current
     if not config.get('inverter_power'):
         raise SolisControlException('No battery details from connection')
-    charge_current = config['charge_period']['current']
-    discharge_current = config['discharge_period']['current']
     inverter_max = config['inverter_max_current'] - config['inverter_power']
     battery_max = config['battery_max_current'] - config['inverter_power'] # was config['battery_discharge_max']
-    if charge_current > battery_max: 
-        return 'Charge current %.1fA > battery max %.1fA' % (charge_current, battery_max)
-    if discharge_current > battery_max: 
-        return 'Discharge current %.1fA > battery max %.1fA' % (discharge_current, battery_max)
-    if charge_current > inverter_max:
-        return 'Charge current %.1fA > inverter max %.1fA' % (charge_current, inverter_max)
-    if discharge_current > inverter_max:
-        return 'Discharge current %.1fA > inverter max %.1fA' % (discharge_current, inverter_max)
+    periods = extract_periods(config)
+    for p in periods:
+        current = p['current']
+        if current > battery_max: 
+            return '%s current %.1fA > battery max %.1fA' % (p['name'], current, battery_max)
+        if current > inverter_max:
+            return '%s current %.1fA > inverter max %.1fA' % (p['name'], current, inverter_max)
     return 'OK'
+    
+def extract_periods(config): # extract configured charge/discharge periods from the config
+    # note in output 'timeslot' can be 0, 1 or 2
+    # which in 'long name' is converted to Time Slot 1, Time Slot 2 or Time Slot 3 
+    result = [ ]
+    for k, v in config.items():
+        if (k.startswith('charge_period') or k.startswith('discharge_period')) and isinstance(v, dict):
+            if k.startswith('charge_period'): 
+                timeslot = int(k[13:]) if k[13:].isdigit() else 1
+                timeslot = timeslot if timeslot in (1, 2, 3) else 1
+                long_name = "Charge Time Slot %d ('%s')" % (timeslot, k)
+                period = { 'name': k, 'charge': True, 'timeslot': timeslot-1, 'long_name': long_name } # NB timeslot is zero based
+            elif k.startswith('discharge_period'):
+                timeslot = int(k[16:]) if k[16:].isdigit() else 1
+                timeslot = timeslot if timeslot in (1, 2, 3) else 1
+                long_name = "Discharge Time Slot %d ('%s')" % (timeslot, k)
+                period = { 'name': k, 'charge': False, 'timeslot': timeslot-1, 'long_name': long_name } # NB timeslot is zero based
+            else:
+                continue
+            period.update(v)
+            result.append(period)
+    return result
     
 def check_all(config, diff_mins=5.0):
     # check time sync and current settings
@@ -353,15 +373,19 @@ def print_status(config, debug=False):
     print('Check Current:', check_current(config))
     
     if debug:
-        print ('Notional morning charging times to reach 1,3,7 kWh available')
-        print(charge_times(config, 1.0))
-        print(charge_times(config, 3.0))
-        print(charge_times(config, 7.0))
-        
-        print ('Notional evening discharging times to reach 1,3,7 kWh available')
-        print(discharge_times(config, 1.0))
-        print(discharge_times(config, 3.0))
-        print(discharge_times(config, 7.0))
+        periods = extract_periods(config)
+        for p in periods:
+            if p['charge']:
+                print ('Notional %s charging times to reach 1,3,7 kWh available' % p['name'])
+                print(charge_times(p, full_energy, current_energy, 1.0))
+                print(charge_times(p, full_energy, current_energy, 3.0))
+                print(charge_times(p, full_energy, current_energy, 7.0))
+            else:
+                print ('Notional %s discharging times to reach 1,3,7 kWh available' % p['name'])
+                print(discharge_times(p, current_energy, 1.0))
+                print(discharge_times(p, current_energy, 3.0))
+                print(discharge_times(p, current_energy, 7.0))
+
     
            
 
