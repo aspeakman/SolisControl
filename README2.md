@@ -94,7 +94,7 @@ _inverter_max_current_ is the max charge and discharge inverter current in amps 
 
 _energy_amp_hour_ energy (in kWh) stored/released for each hour and amp of current (default 0.05). The app converts the household energy
 requirement into a charging/discharging period based on this setting. By default it is based on a rough rule of thumb that 20A times
- 1 hour adds 1 kWh of charge – see https://www.youtube.com/watch?v=ps22E30OUEk You can adjust this depending on the age and state of your
+ 1 hour adds 1 kWh of stored energy - see https://www.youtube.com/watch?v=ps22E30OUEk You can adjust this depending on the age and state of your
  battery (see _calc_energy_amp_hour_ service below)
 
 _api_url_ default is 'https://www.soliscloud.com:13333' 
@@ -121,12 +121,12 @@ _battery_capacity_, _battery_max_current_ and _inverter_max_current_ (see above)
 You can also set a _sync_ setting for the appropriate period to choose whether
 the charge/discharge episode is tied to the 'start' or 'end' of the period or takes place at a random point within it (the default).
 
-You can define an optional _cron_before_ setting within each period which overrides the main solis_control setting above.
+You can define an optional _cron_before_ setting within each period which overrides the main _solis_control_ setting above.
 
 Within each defined period you can also set an optional _kwh_requirement_ which is the exact target energy 'reserve' you want to
 have in place after that time period (this overrides the _daily_consumption_kwh_ and the _energy_monitor_ sensor settings above)
 
-**Note** that you can set _kwh_requirement to zero which means charge/discharge activity will be actively turned off each day
+**Note** that you can set _kwh_requirement_ to zero which means charge/discharge activity will be actively turned off each day.
 Alternatively a negative number will disable any action for this period (preserving any existing charge/discharge times)
 Also _kwh_requirement_ can be the id of an entity which defines the value eg a helper = 
 'input_number.morning_reserve')
@@ -217,7 +217,7 @@ apps:
 ## Solis S3 Logger
 
 If you have an S3 data logger that occasionally disconnects 
-(and have installed `solis_s3_logger.py` see above) you can add these lines under `solis_control` in the `solis_flux_times` section
+(and have installed `solis_s3_logger.py` see above) you can add these lines under _solis_control_ in the _solis_flux_times_ section
 of `config.yaml`.
 This will check for access just before each charge or discharge period and if necessary restart the logger.
 
