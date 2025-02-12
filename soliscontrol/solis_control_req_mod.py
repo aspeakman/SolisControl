@@ -2,6 +2,8 @@ from requests import Session, RequestException
 from http import HTTPStatus
 import logging
 import yaml
+import json
+from datetime import datetime
 
 try:
     import solis_common as common
@@ -43,7 +45,7 @@ def get_session():
     return Session()
     
 def get_inverter_entry(config, session): 
-    body = '{"stationId":"'+config['station_id']+'"}'
+    body = '{"stationId":"'+config['solis_station_id']+'"}'
     header = common.prepare_post_header(config, body, common.INVERTER_ENDPOINT)
     if not config.get('api_url'):
         config['api_url'] = common.DEFAULT_API_URL
@@ -55,7 +57,7 @@ def get_inverter_entry(config, session):
                 result = response.json()
                 if result.get('success') and result.get('data'):
                     for record in result['data']['page']['records']:
-                      if record.get('stationId', '') == config['station_id']:
+                      if record.get('stationId', '') == config['solis_station_id']:
                         common.add_fields(common.ENTRY_FIELDS, record, config)
                         inverter_entry = record
                 else:
@@ -90,11 +92,11 @@ def get_inverter_detail(config, session):
                 log.warning('HTTP error getting inverter detail: %d %s' % (status, response.text))
     except RequestException as e:
         log.warning('Request exception getting inverter detail: ' + str(e))
-    #print(inverter_detail)
+    #print(json.dumps(inverter_detail, indent=2))
     return inverter_detail
         
 def get_login_detail(config, session): 
-    body = '{"userInfo":"'+config['user_name']+'","passWord":"'+common.password_encode(config['password'])+'"}'
+    body = '{"userInfo":"'+config['solis_user_name']+'","passWord":"'+common.password_encode(config['solis_password'])+'"}'
     header = common.prepare_post_header(config, body, common.LOGIN_ENDPOINT)
     if not config.get('api_url'):
         config['api_url'] = common.DEFAULT_API_URL
@@ -180,12 +182,7 @@ def set_inverter_data(config, session, inverter_data=None):
         config['api_url'] = common.DEFAULT_API_URL
     set_times_msg = None
     if inverter_data is None:
-        inverter_data = '50,50,00:00,00:00,00:00,00:00,50,50,00:00,00:00,00:00,00:00,50,50,00:00,00:00,00:00,00:00'
-    else:
-        inverter_data = inverter_data.replace('-', ',')
-        ivt = inverter_data.split(',')
-        if len(ivt) != 18:
-            raise SolisControlException('Bad inverter data: len != 18 -> %s' % inverter_data)
+        inverter_data = common.DEFAULT_INVERTER_DATA
     try:
         body = common.prepare_body(config, inverter_data)
         headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
@@ -228,8 +225,69 @@ def get_inverter_data(config, session):
         log.warning('Request exception getting charging/discharging times: ' + str(e))
     if not inverter_data:
         return None
-    #print(inverter_data)
+    print(inverter_data)
     return inverter_data
+        
+def get_inverter_datetime(config, session):
+    if not config.get('login_token'):
+        raise common.SolisControlException('Not logged in')
+    body = '{"inverterId":"'+config['inverter_id']+'","cid":"56"}'
+    headers = common.prepare_post_header(config, body, common.READ_ENDPOINT)
+    headers['token']= config['login_token']
+    if not config.get('api_url'):
+        config['api_url'] = common.DEFAULT_API_URL
+    inverter_datetime = None                    
+    try:
+        with make_request(session.post, config['api_url']+common.READ_ENDPOINT, data = body, headers = headers) as response:
+            status = response.status_code
+            if status == HTTPStatus.OK:
+                result = response.json()
+                if result.get('code') == '0'  and result.get('data') and result['data'].get('msg'): 
+                    inverter_datetime = datetime.fromisoformat(result['data']['msg'])
+                    config['inverter_datetime'] = inverter_datetime
+                    config['host_datetime'] = datetime.now()
+                else:
+                    log.warning('Payload error getting inverter time: %s' % (str(result)))
+            else:
+                log.warning('HTTP error getting inverter time: %d %s' % (status, response.text))
+    except RequestException as e:
+        log.warning('Request exception getting inverter time: ' + str(e))
+    if not inverter_datetime:
+        return None
+    #print(inverter_datetime)
+    return inverter_datetime
+    
+def set_inverter_datetime(config, session, inverter_datetime=None):
+    if not config.get('login_token'):
+        raise common.SolisControlException('Not logged in')
+    if not config.get('api_url'):
+        config['api_url'] = common.DEFAULT_API_URL
+    set_time_msg = None
+    if inverter_datetime is None:
+        inverter_datetime = datetime.now()
+    else:
+        if isinstance(inverter_datetime, str):
+            inverter_datetime = datetime.fromisoformat(inverter_datetime)
+        if not isinstance(inverter_datetime, datetime):
+            raise SolisControlException('Bad inverter datetime -> %s' % str(inverter_datetime))
+    try:
+        value = inverter_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        body = '{"inverterId":"'+config['inverter_id']+'","cid":"56","value":"'+value+'"}'
+        headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
+        headers['token'] = config['login_token']
+        with make_request(session.post, config['api_url']+common.CONTROL_ENDPOINT, data = body, headers = headers) as response:
+            status = response.status_code
+            if status == HTTPStatus.OK:
+                result = response.json()
+                if result.get('code') == '0': 
+                    set_time_msg = 'OK'
+                else:
+                    set_time_msg = 'Payload error setting inverter time: %s' % (str(result))
+            else:
+                set_time_msg = 'HTTP error setting inverter time: %d %s' % (status, response.text)
+    except RequestException as e:
+        set_time_msg = 'Request exception setting inverter time: ' + str(e)
+    return set_time_msg
        
 def connect(config, session):
     if not get_inverter_entry(config, session):
@@ -237,6 +295,12 @@ def connect(config, session):
     if not get_inverter_detail(config, session):
         return False
     if not get_login_detail(config, session):
+        return False
+    get_inverter_datetime(config, session)
+    check = common.check_time(config) # default acceptable time difference = 1 min
+    if check != 'OK':
+        check = set_inverter_datetime(config, session)
+    if check != 'OK':
         return False
     return True
                 

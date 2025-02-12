@@ -87,7 +87,8 @@ if __name__ == "__main__":
                         params = { 'start': cstart, 'end': cend, 'amps': str(config_period['current']) }
                         result = solis_control.set_inverter_params(config, session, params, charge=p['charge'], timeslot=p['timeslot'])
                     if not args.silent:
+                        print()
                         if result == 'OK':
-                            print ('%s New %s: %s - %s (%sA)' % (action, p['long_name'], cstart, cend, str(config_period['current'])))
+                            print ('***%s New %s: %s - %s (%sA)' % (action, p['long_name'], cstart, cend, str(config_period['current'])))
                         else:
-                            print ('%s Error: %s' % (p['long_name'], result))
+                            print ('***%s Error: %s' % (p['long_name'], result))

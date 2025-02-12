@@ -2,43 +2,254 @@ allow_all_imports: true
 hass_is_global: false
 apps:
   solis_flux_times:
+    energy_monitor: 'solis_daily_grid_energy_used' # entity id of daily household energy monitor (kWh) - in 'sensor' domain
+    history_days: 7 # duration of stored forecast and energy use history (default is 7)
+    #daily_consumption_kwh: 12 # fixed estimate of daily household energy use (kWh) (if uncommented, overrides use of 'energy_monitor')
     forecast_remaining: 'solcast_pv_forecast_forecast_remaining_today' # entity id of Solcast remaining energy today (kWh) - in 'sensor' domain
-    # forecast_remaining: 'energy_production_today_remaining' #  alternative entity id of Forecast.Solar remaining energy today (kWh) - in 'sensor' domain
-    forecast_uplift: 1.0 # multiplication factor for forecast values if they prove to be pessimistic or optimistic
+    forecast_tomorrow: 'solcast_pv_forecast_forecast_tomorrow' # entity id of Solcast tomorrow prediction (kWh) - in 'sensor' domain
+    #forecast_multiplier: 1.0 # fixed multiplication factor for solar forecast values (if uncommented, overrides use of 'forecast_tomorrow')
     cron_before: 10 # minutes (default 20) before start of periods below to set charging/discharging times based on target levels
     solis_control:
-      key_secret: !secret solis_key_secret
-      key_id: !secret solis_key_id
-      user_name: !secret solis_user_name
-      password: !secret solis_password
-      station_id: !secret solis_station_id
-      #api_url: = 'https://www.soliscloud.com:13333' # default
+      solis_key_secret: !secret solis_key_secret
+      solis_key_id: !secret solis_key_id
+      solis_user_name: !secret solis_user_name
+      solis_password: !secret solis_password
+      solis_station_id: !secret solis_station_id
       battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
       battery_max_current: 74 # in amps (eg 2 * Pylontech US3000C with Recommend Charge Current of 37A each)
-      # Also see https://www.youtube.com/watch?v=h1A80cSOrhA to view battery Dis/Charging Current Limits
       inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
+      energy_amp_hour: 0.05 # default .05 - energy (in kWh) stored/released for each hour and amp of current
       charge_period: # Octopus Flux Cheap period in morning when energy can be imported from the grid at low rates
-        start: "02:05" # HH:MM string
-        end: "04:55" # HH:MM string
+        start: "02:01" # HH:MM string
+        end: "04:59" # HH:MM string
         current: 50 # charge current setting in amps
         sync: 'random' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
-        kwh_after: 12.0 # target kWh level for rest of the day (solar predicted + battery reserve) after charge period
-        # zero means charging for this period will be turned off (a negative number will disable any action)
-        # can also be the id of an entity which defines this eg a helper = 'input_number.morning_reserve'
-      charge_period2: # 2nd period when energy can be imported from the grid eg top up to avoid importing during peak period
-        start: "14:30"
-        end: "15:30" 
+      charge_period2: # 2nd period when energy can be imported from the grid = potential top up at medium rates to avoid importing during peak period
+        start: "14:15"
+        end: "15:45" 
         current: 50 # charge current setting in amps
         sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
-        kwh_after: 6.0 # target kWh level (solar predicted + battery stored) after 2nd charge period
       discharge_period: # Octopus Flux Peak period in evening when energy can be exported to the grid at high rates
-        start: "16:05" # set both to "00:00" if no discharging
-        end: "18:55" # set both to "00:00" if no discharging
+        start: "16:01" 
+        end: "18:59" 
         current: 50 # discharge current setting in amps
         sync: 'random' # if 'start', discharging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
-        kwh_after: 5.0 # target kWh level (solar predicted + battery reserve) after discharge period
-        # zero means discharging will be turned off (a negative number will disable any action)
-        # can also be the id of an entity which defines this eg a helper = 'input_number.evening_reserve'
-      #s3_username: !secret solis_s3_username
-      #s3_password: !secret solis_s3_password
-      #s3_ip: !secret solis_s3_ip
+        kwh_requirement: 0 # zero means no discharging takes place, -1 means no action is taken (preserves existing settings)
+      #solis_s3_username: !secret solis_s3_username
+      #solis_s3_password: !secret solis_s3_password
+      #solis_s3_ip: !secret solis_s3_ip
+                 
+        
+                                                                                
+                                               
+                                               
+        
+                                       
+                                        
+                       
+                     
+                     
+                                                     
+                 
+        
+                         
+                                
+          
+                              
+                                       
+         
+                 
+        
+                                              
+                                             
+                                           
+                                               
+                                           
+                                            
+        
+                                                 
+                                                                                                                 
+                                                                    
+                         
+                                                                                                     
+                                              
+                                 
+                        
+                                                                                                                                
+                                                                                                         
+                              
+            
+                                                                            
+                                               
+                                                  
+                                                                    
+                   
+
+                                                                        
+                                                                                   
+                                                                                                                      
+                                                            
+                                                                                                                                                   
+                
+    
+                             
+                                      
+                        
+                                                   
+                                     
+                       
+                                
+                                                    
+                                
+                        
+    
+                                                                                                              
+                                                        
+                                                                     
+         
+                                  
+                  
+                                    
+                                                        
+                                                     
+                                                                                                                  
+                                  
+                                                                                                                      
+                 
+
+                                                                    
+                                                                    
+                                                                    
+                                                                    
+                                                                    
+                                                                    
+                                         
+                  
+              
+                                       
+                                                                                                       
+              
+                                
+                                 
+                                                   
+                                                                             
+                                                                                                                     
+                                                                                                                       
+                                                                                         
+                                            
+                                                                                                                
+        
+                                                                               
+                 
+                                                             
+                                                
+                                                           
+                                           
+                                                                                             
+                                                                                                                    
+                                                          
+                     
+                                                                                                    
+                                                                                                                              
+                      
+                                 
+                                                                                                                                                                     
+                 
+                                    
+                                                                                                                                                              
+                                                                      
+                                                                                                                                        
+                    
+                                                                                             
+                 
+                                                                                              
+                                                                                                                     
+                                                                 
+                              
+                            
+                                                             
+                                                       
+                                                                                                
+                     
+                                                                                                           
+                 
+                                                       
+                                                                                                             
+                     
+                                                                                                                        
+             
+                                                       
+                 
+    
+                                              
+                                                                         
+                                                 
+                                        
+                                               
+                                          
+              
+                                        
+                                          
+            
+                                  
+                             
+                                                                                              
+                                
+          
+                                  
+                            
+                                            
+
+                                     
+                                                                     
+           
+                  
+                                                                                                  
+       
+              
+                                                                 
+                           
+                   
+                 
+                                                                                                                        
+                 
+                    
+               
+                                                                                                      
+                   
+                    
+                   
+   
+                 
+                     
+                                    
+                      
+                 
+                  
+                                                                                                            
+              
+                              
+                                                 
+                             
+                        
+                                                            
+                        
+                                                                                    
+                                                                                                               
+         
+                                                                                                      
+        
+                                            
+                  
+           
+                  
+                                                    
+   
+                                                
+                                                           
+                                                                                             
+                                                                                                                    
+             
+                                                           
+        
+

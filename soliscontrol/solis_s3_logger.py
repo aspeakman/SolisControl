@@ -6,9 +6,9 @@ import time
 """ Check the local S3 data logger is working and if necessary restart it to reconnect to Solis servers
 
 Requires configuration settings in secrets.yaml:
-s3_username: # default is 'admin'
-s3_password: # same as WiFi password
-s3_ip: # local IP address of logger
+solis_s3_username: # default is 'admin'
+solis_s3_password: # same as WiFi password
+solis_s3_ip: # local IP address of logger - 192.168.x.x
                                                                 
 For use with Pyscript 
 connection state is passed between methods in the config dict
@@ -20,9 +20,9 @@ See https://hacs-pyscript.readthedocs.io/en/latest/index.html"""
 DEFAULT_USERNAME = 'admin'
 DEFAULT_PASSWORD = '123456789'
 DEFAULT_IP = '10.10.100.254'
-USERNAME_FIELD = 's3_username'
-PASSWORD_FIELD = 's3_password'
-IP_FIELD = 's3_ip'
+USERNAME_FIELD = 'solis_s3_username'
+PASSWORD_FIELD = 'solis_s3_password'
+IP_FIELD = 'solis_s3_ip'
 
 try:
     task.executor()
@@ -118,7 +118,7 @@ def restart(config, session):
             if not response.ok:
                 return 'HTTP error during restart: %d %s' % (response.status_code, response.text)
     except RequestException as e:
-        return 'Request exception during restart: ' + str(e)
+        return 'Request exception during restart: ' + str(e)  
         
     return 'OK'
     
@@ -129,12 +129,19 @@ def check_logger(config, session): # does basic check and restart if necessary
             log.info('Inverter not connected to logger - restarting data logger')
             restarted = restart(config, session)
             if restarted == 'OK':
-                log.info('Restarted OK')
+                msg = 'OK - Restarted'
+                log.info(msg)
                 sleep(15)
             else:
-                log.warning(restarted)
+                msg = restarted
+                log.warning(msg)
         else:
-            log.info('Inverter connected to logger - OK')
+            msg = 'OK - Inverter connected to logger'
+            log.info(msg)
+    else:
+        msg = 'Cannot connect to logger'
+        log.warning(msg)
+    return msg
     
 def connect(config, session):
     
