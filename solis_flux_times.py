@@ -1,4 +1,4 @@
-from datetime import time, date, timedelta
+from datetime import time, date, timedelta, datetime
 
 import solis_control_req_mod as solis_control
 import solis_common as common
@@ -208,12 +208,13 @@ def set_times_entity(period_name, start='00:00', end='00:00', current=None):
     entity = 'pyscript.' + period_name + '_times'
     if pyscript_get(entity) is not None:
         if start == '00:00' and end == '00:00':
-            state.set(entity, value='Off')
+            value='Off'
         else: 
             value = start + ' to ' + end
             if current:
                 value += ' @' + str(current) + 'A'
-            state.set(entity, value=value)
+        value += datetime.now().strftime(' set at %Y-%m-%d %H:%M')
+        state.set(entity, value=value)
             
 @time_trigger("cron(50 23 * * *)")
 def store_daily_energy_use():

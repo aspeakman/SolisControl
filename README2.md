@@ -70,7 +70,7 @@ after discharging) and the predicted solar yield for the rest of the day (if the
 _forecast_remaining_ (optional) remaining forecast solar energy today (kWh) (the id of an entity in the 'sensor' domain)
 
 >If you do use a solar forecaster, then the accuracy of any solar predictions can be adjusted, either by a fixed multiplier (_forecast_multiplier_) or by comparing  
-the history of a solar prediction sensor (_forecast_tomorrow_) against actual solar energy yielded (over _history_days_)
+>the history of a solar prediction sensor (_forecast_tomorrow_) against actual solar energy yielded (over _history_days_)
 
 >**Either**
 
@@ -99,15 +99,15 @@ requirement into a charging/discharging period based on this setting. By default
 
 _api_url_ default is 'https://www.soliscloud.com:13333' 
 
-_solis_key_secret_
+_solis_key_secret_ see `config.yaml` example below
 
-_solis_key_id_
+_solis_key_id_ see `config.yaml` example below
 
-_solis_user_name_
+_solis_user_name_ see `config.yaml` example below
 
-_solis_password_
+_solis_password_ see `config.yaml` example below
 
-_solis_station_id_
+_solis_station_id_ see `config.yaml` example below
 
 ### charge_period / discharge_period settings
 
@@ -244,16 +244,16 @@ There is a _test_solis_flux_times_ pyscript service which tests the connection t
 
 And a _check_s3_logger_ pyscript service which (if configured) tests that the S3 logger is connected and restarts it if necessary
 
-And a _clear_inverter_times pyscript service which clears out any existing scheduled charge/discharge settings
+And a _clear_inverter_times_ pyscript service which clears out any existing scheduled charge/discharge settings
 
 And a _calc_energy_amp_hour_ pyscript service which calculates the constant from observed charging/discharging values
 
 ## Entity States
 
-Some useful entities which are set by the app:
+Some useful entities which are set by the app (depending on the configured charge/discharge periods):
 
->_pyscript.charge_period_times_ = either 'Off' or the currently set #1 charge period (HH:MM to HH:MM) 
+>_pyscript.charge_period_times_ = either 'Off' or the currently set #1 charge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
 
->_pyscript.charge_period2_times_ = either 'Off' or the currently set #2 charge period (HH:MM to HH:MM) 
+>_pyscript.charge_period2_times_ = either 'Off' or the currently set #2 charge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
 
->_pyscript.discharge_period_times_ = either 'Off' or the currently set #1 discharge period (HH:MM to HH:MM) 
+>_pyscript.discharge_period_times_ = either 'Off' or the currently set #1 discharge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
