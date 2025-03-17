@@ -1,12 +1,11 @@
 # SolisControl
 
 A Python package **soliscontrol** which has modules for controlling a Solis battery/inverter setup using the Solis Cloud API. 
-This can be used to view key inverter parameters and to 
-set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). It will also
-check that times are synchronised with the inverter and that charge currents do not exceed the configured maxima.
+This can be used to view key inverter parameters and to set daily charge times (within a cheap rate period) or discharge times (within a peak rate period). 
+It will also check that times are synchronised with the inverter and that charge currents do not exceed the configured maxima.
 
 The project also includes **solis_flux_times** a [Pyscript](https://hacs-pyscript.readthedocs.io/en/latest/) Home Assistant app 
- for use with energy suppliers that offer cheap rate charging periods and peak rate discharging periods
+for use with energy suppliers that offer cheap rate charging periods and peak rate discharging periods
 such as the [Octopus Flux](https://octopus.energy/smart/flux/) tariff. For details see [README2](./README2.md).
 
 This project is based on the Solis API docs for 
@@ -14,6 +13,10 @@ This project is based on the Solis API docs for
 and [control](https://oss.soliscloud.com/doc/SolisCloud%20Device%20Control%20API%20V2.0.pdf)	
 (and on the [solis_control](https://github.com/stevegal/solis_control) project which
 has the practical details for constructing requests to the Solis API). 
+
+## Installation
+
+See `INSTALL.txt`
 
 ## Pre-requisites
 
@@ -33,7 +36,7 @@ set _Time of Use: Optimal Income_ to _Run_ - see <https://www.youtube.com/watch?
 
 ## Configuration
 
-Put your `secrets.yaml` in the _soliscontrol_ folder then edit `main.yaml` to suit - an example as follows:
+Put your `secrets.yaml` in the _soliscontrol_ folder then use `example_main.yaml` as a template to create your own `main.yaml` - an example as follows:
 
 ```
 battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)

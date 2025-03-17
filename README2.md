@@ -50,7 +50,7 @@ Finally edit `config.yaml` and `secrets.yaml` (see below) in the main pyscript f
 The app decides internally on the length of each charge/discharge period (see below) based on the household energy 
 requirement remaining at that time of day. **By default** this is based on the _energy_monitor_ sensor which is used to keep track of the 
 maximum daily consumption over the previous _history_days_ period, then adjusts it based on the proportion of the day remaining.
-**Alternatively** you can set _daily_consumption_kwh_ which is an exact household consumption requirement for the day. 
+**Alternatively** you can set _daily_consumption_kwh_ or _kwh_requirement_ which are exact household consumption requirements. 
 
 **Either**
 
@@ -62,10 +62,16 @@ energy consumption (kWh)
 **Or**
 
 >_daily_consumption_kwh_ which sets an estimated daily household energy consumption requirement (kWh) (or can be the id of an entity which defines the value eg a helper = 
-'input_number.kwh_consumption')
+'input_number.daily_kwh_consumption')
 
-Note that the household energy requirement calculated or set above consists of the battery energy stored after charging (or remaining 
-after discharging) and the predicted solar yield for the rest of the day (if the optional _forecast_remaining_ setting is filled in)
+**Or**
+
+>_kwh_requirement_ set within each charge or discharge period (see below) which is the exact target energy 'reserve' you want to
+have in place after that time period (or can be the id of an entity which defines the value eg a helper = 
+'input_number.morning_reserve')
+
+Note that the household energy requirements calculated or set above consist of the battery energy stored after charging (or remaining 
+after discharging) AND the predicted solar yield for the rest of the day (if the optional _forecast_remaining_ setting is filled in)
 
 _forecast_remaining_ (optional) remaining forecast solar energy today (kWh) (the id of an entity in the 'sensor' domain)
 
@@ -239,21 +245,24 @@ solis_s3_ip: "xxxx" # usually starts with '192.168.'
 
 ## Services
 
-There is a _test_solis_flux_times_ pyscript service which tests the connection to the Solis API and
- shows notional charge/discharge times for various settings (ignoring solar forecast and current energy)
+Some useful services offered by the app:
 
-And a _check_s3_logger_ pyscript service which (if configured) tests that the S3 logger is connected and restarts it if necessary
+>_test_solis_flux_times_ which tests the connection to the Solis API and shows notional charge/discharge times for various settings (ignoring solar forecast and current energy)
 
-And a _clear_inverter_times_ pyscript service which clears out any existing scheduled charge/discharge settings
+>_check_s3_logger_ which (if configured) tests that the S3 logger is connected and restarts it if necessary
 
-And a _calc_energy_amp_hour_ pyscript service which calculates the constant from observed charging/discharging values
+>_clear_inverter_times_ which clears out any existing scheduled charge/discharge settings
+
+>_calc_energy_amp_hour_ which calculates the constant from observed charging/discharging values
 
 ## Entity States
 
-Some useful entities which are set by the app (depending on the configured charge/discharge periods):
+Examples of useful entities which are set by the app (depending on the configured charge/discharge periods):
 
 >_pyscript.charge_period_times_ = either 'Off' or the currently set #1 charge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
 
 >_pyscript.charge_period2_times_ = either 'Off' or the currently set #2 charge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
 
 >_pyscript.discharge_period_times_ = either 'Off' or the currently set #1 discharge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
+
+>_pyscript.energy_use_history_ = list of _energy_monitor_ values for the previous _history_days_ period

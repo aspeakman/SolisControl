@@ -1,0 +1,42 @@
+Note these instructions are for the 'soliscontrol' python module NOT the 'solis_flux_times' Home Assistant pyscript app
+
+Basic installation (for standalone testing) - steps are as follows:
+
+### Check python 3 and set up pip ###
+    python -V (check the version is >= 3.8)
+    python -m pip install --upgrade pip
+
+### First time development install ###
+    Open a command shell
+    If the SolisControl folder does not exist
+        Run 'git clone https://github.com/aspeakman/SolisControl.git SolisControl'
+        Change directory to 'SolisControl'
+    If the SolisControl exists
+        Change directory to 'SolisControl'
+        Run 'git clone https://github.com/aspeakman/SolisControl.git .'
+    Run 'pip -m venv venv'
+    Enter the 'venv' virtual environment
+        Run 'source venv/bin/activate' or 'venv\scripts\activate.bat' depending on your local host
+        Or adapt the 'runsh' or 'runcmd.bat' scripts in the 'scripts' sub-directory
+    Once you see the (venv) prompt
+    Run 'python -m pip install --upgrade pip setuptools wheel'
+    See the 'README.md' for details of how to create and configure 'main.yaml' and 'secrets.yaml'
+    Try 'python solis_run.py -h'
+    
+### To update software version subsequently ###
+    Open a command shell
+    Change directory to 'SolisControl'
+    Run 'git pull'
+    
+### To use as a package in another project
+    Install as above then link to the local repository within the other project
+        python -m pip install -e <path to SolisControl folder used above>
+    Alternatively (you can replace 'main' with any other branch)
+        python -m pip install -U "soliscontrol @ https://github.com/aspeakman/SolisControl/archive/refs/heads/main.zip"
+    Or (optionally you can append @branch or @version)
+        python -m pip install -U "soliscontrol @ git+https://github.com/aspeakman/SolisControl.git"
+
+
+
+
+
