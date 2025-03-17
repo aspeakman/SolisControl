@@ -134,7 +134,12 @@ def calc_requirement(source): # calculate requirement based on daily consumption
     else:
         lf = get_flist(ENERGY_USE)
         if not lf:
-            return -1.0 # do nothing
+            sensor_name = pyscript.app_config.get('energy_monitor', 'solis_daily_grid_energy_used')
+            st = sensor_get(sensor_name)
+            if st:
+                lf = [ float(st) ]
+            else:
+                return -1.0 # do nothing
         req_kwh = max(lf) # maximum of the stored values
     start = time.fromisoformat(source['start']+':00')
     prop_remain = (24.0 * 60.0 - (start.hour * 60.0) - start.minute) / (24.0 * 60.0) # proportion of day remaining
@@ -213,7 +218,7 @@ def set_times_entity(period_name, start='00:00', end='00:00', current=None):
             value = start + ' to ' + end
             if current:
                 value += ' @' + str(current) + 'A'
-        value += datetime.now().strftime(' set at %Y-%m-%d %H:%M')
+        value += datetime.now().strftime(' (set %H:%M %b %d)')
         state.set(entity, value=value)
             
 @time_trigger("cron(50 23 * * *)")
