@@ -110,7 +110,7 @@ def prepare_body(config, inverter_data=None):
     # charge_current1,discharge_current1,charge_start1,charge_end1,discharge_start1,discharge_end1,
     # etc for 2 and 3 time slots
     if not config.get('inverter_id'):
-        raise SolisControlException('Not connected')
+        raise SolisControlException('No inverter id details from connection')
     if inverter_data:
         ivt = validated_inverter_data(inverter_data)
         inverter_data = ','.join(ivt)
@@ -140,7 +140,7 @@ def update_inverter_data(inverter_data, params, charge=True, timeslot=0):
     # update one entry in the full inverter_data string (which has charge/discharge time and amp settings for 3 time slots)
     # note params is a dict with 'start' (HH:MM), 'end' (HH:MM) and optional 'amps' keys
     # charge should be True for charging, otherwise False for discharging
-    # timeslot can be 0, 1 or 2
+    # timeslot can ONLY be 0, 1 or 2
     ivt = validated_inverter_data(inverter_data)
     if not params or 'start' not in params or 'end' not in params:
         raise SolisControlException("Bad params: requires 'start' and 'end' keys")
@@ -315,10 +315,10 @@ def prepare_post_header(config, body, canonicalized_resource):
 def check_current(config):
     # current for charging/discharging must be below inverter max and also below battery_max_current
     if not config.get('inverter_power'):
-        raise SolisControlException('No battery details from connection')
+        raise SolisControlException('No inverter power details from connection')
     inverter_max = config['inverter_max_current'] - config['inverter_power']
     battery_max = config['battery_max_current'] - config['inverter_power'] # was config['battery_discharge_max']
-    periods = extract_periods(config)
+    periods = extract_periods(config, max_three=False)
     for p in periods:
         current = p['current']
         if current > battery_max: 
@@ -327,24 +327,36 @@ def check_current(config):
             return '%s current %.1fA > inverter max %.1fA' % (p['name'], current, inverter_max)
     return 'OK'
     
-def extract_periods(config): # extract configured charge/discharge periods from the config
-    # note in output 'timeslot' can be 0, 1 or 2
-    # which in 'long name' is converted to Time Slot 1, Time Slot 2 or Time Slot 3 
+def extract_periods(config, max_three=True): # extract configured charge/discharge periods from the config
+    # note in output 'timeslot' can only be 0, 1 or 2
+    # which in 'long name' is represented as Period 1, Period 2, Period 3 ...
+    # if max_three is False the number of periods is not restricted to 3 (the number of timeslots in the inverter)
+    # ie the timeslots are re-used (modulo 3)
     result = [ ]
     for k, v in config.items():
-        if (k.startswith('charge_period') or k.startswith('discharge_period')) and isinstance(v, dict):
-            if k in ('charge_period', 'charge_period1', 'charge_period2', 'charge_period3'): 
-                timeslot = int(k[13:]) if len(k) == 14 else 1
-                long_name = "Charge Time Slot %d ('%s')" % (timeslot, k)
-                period = { 'name': k, 'charge': True, 'timeslot': timeslot-1, 'long_name': long_name } # NB timeslot is zero based
-            elif k in ('discharge_period', 'discharge_period1', 'discharge_period2', 'discharge_period3'):
-                timeslot = int(k[16:]) if len(k) == 17 else 1
-                long_name = "Discharge Time Slot %d ('%s')" % (timeslot, k)
-                period = { 'name': k, 'charge': False, 'timeslot': timeslot-1, 'long_name': long_name } # NB timeslot is zero based
-            else:
-                continue
-            period.update(v)
-            result.append(period)
+        if not isinstance(v, dict):
+            continue
+        if k.startswith('charge_period'): 
+            len_prefix = 13
+            charge = True
+            ptype = 'Charge'
+        elif k.startswith('discharge_period'):
+            len_prefix = 16
+            charge = False
+            ptype = 'Discharge'
+        else:
+            continue
+        if len(k) > len_prefix and not k[len_prefix:].isdigit():
+            continue
+        i = 1 if len(k) == len_prefix else int(k[len_prefix:])
+        if i == 0:
+            i = 1
+        if max_three and i > 3:
+            continue
+        long_name = "%s Period %d ('%s')" % (ptype, i, k) # starts from 1
+        period = { 'name': k, 'charge': charge, 'timeslot': (i-1)%3, 'long_name': long_name } # NB timeslot is now 0, 1 or 2
+        period.update(v)
+        result.append(period)
     return result
     
 def check_all(config, diff_mins=1.0):
@@ -369,7 +381,7 @@ def json_strip(response_text): # strip erroneous trailing commas in JSON dicts
     json_string = re.sub(r'\s*,(\s*})', r'\1', response_text) 
     return json.loads(json_string)
 
-def print_status(config, debug=False):
+def print_status(config):
     print ('ID:', config['inverter_id'])
     print ('SN:', config['inverter_sn'])
     
@@ -388,9 +400,8 @@ def print_status(config, debug=False):
     
     print('Check Current:', check_current(config))
     
-    print(eah_from_soc(config['battery_capacity'], 58, 178, 27, 100))
+    #print('Calculated EAH:', eah_from_soc(config['battery_capacity'], 58, 178, 27, 100))
     
-
     
            
 

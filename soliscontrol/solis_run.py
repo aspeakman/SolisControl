@@ -23,7 +23,7 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-r", "--remove", help="remove all existing inverter charging/discharging times", action='store_true')
     parser.add_argument("-s", "--silent", help="no status messages are printed out", action='store_true')
-    parser.add_argument("-t", "--test", help="test mode, no actions are taken", action='store_true')
+    parser.add_argument("-v", "--verbose", help="additional information messages are printed out", action='store_true')
     
     with open('secrets.yaml', 'r') as file:
         secrets = yaml.safe_load(file)
@@ -32,12 +32,14 @@ if __name__ == "__main__":
     config.update(secrets)  
     periods = common.extract_periods(config)
     for p in periods:
+        name_parts = p['long_name'].split()
+        period_number = name_parts[2]
         if p['charge']:
-            short = "-c%d" % (p['timeslot'] + 1)
+            short = "-c%s" % (period_number)
             long = "--%s" % p['name']
             help = "%s duration in minutes (zero means no charging)" % p['long_name'].lower()
         else:
-            short = "-d%d" % (p['timeslot'] + 1)
+            short = "-d%s" % (period_number)
             long = "--%s" % p['name']
             help = "%s duration in minutes (zero means no discharging)" % p['long_name'].lower()
         parser.add_argument(short, long, help=help, type=int)
@@ -45,50 +47,47 @@ if __name__ == "__main__":
 
     with solis_control.get_session() as session:
     
-        solis_control.connect(config, session)
+        connected = solis_control.connect(config, session)
         
-        if args.remove:
-            action = 'Notionally' if args.test else 'Actually'
-            if args.test:
-                result = 'OK'
-            else:
-                result = solis_control.set_inverter_data(config, session, inverter_data=None) # turns off all charging/discharging
-            if not args.silent:
-                if result == 'OK':
-                    print ('%s cleared inverter data' % action)
-                else:
-                    print ('Error: clearing inverter data: %s' % (result))
-        
-        if not args.silent:
-            common.print_status(config, args.test)
-        
-        inverter_data = solis_control.get_inverter_data(config, session)
-        if inverter_data:
+        if connected:
             
             if not args.silent:
-                for p in periods:
-                    existing = common.extract_inverter_params(inverter_data, charge=p['charge'], timeslot=p['timeslot'])
-                    print ('%s: %s - %s (%sA)' % (p['long_name'], existing['start'], existing['end'], existing['amps']))
-                    
-            action = 'Notional' if args.test else 'Actual'
+                common.print_status(config)
             
-            args_dict = dict(vars(args))
-            #for k, v in args_dict.items():
-            #     print(k, v)
-            for p in periods:
-                period_name = p['name']
-                if args_dict.get(period_name) is not None and config.get(period_name):
-                    config_period = config[period_name]
-                    cstart, cend = common.start_end_from_minutes(config_period, args_dict[period_name])
-                    cstart, cend = common.limit_times(config_period, cstart, cend)
-                    if args.test:
-                        result = 'OK'
+            error = False
+            if args.remove:
+                result = solis_control.set_inverter_data(config, session, inverter_data=None, verbose=args.verbose) # turns off all charging/discharging
+                if not args.silent or args.verbose:
+                    if result == 'OK':
+                        print ('Cleared inverter data')
                     else:
+                        print ('Error: clearing inverter data: %s' % (result))
+                        error = True
+            else:
+                args_dict = dict(vars(args))
+                #for k, v in args_dict.items():
+                #     print(k, v)
+                for p in periods:
+                    period_name = p['name']
+                    if args_dict.get(period_name) is not None and config.get(period_name):
+                        config_period = config[period_name]
+                        cstart, cend = common.start_end_from_minutes(config_period, args_dict[period_name])
+                        cstart, cend = common.limit_times(config_period, cstart, cend)
                         params = { 'start': cstart, 'end': cend, 'amps': str(config_period['current']) }
-                        result = solis_control.set_inverter_params(config, session, params, charge=p['charge'], timeslot=p['timeslot'])
-                    if not args.silent:
-                        print()
-                        if result == 'OK':
-                            print ('***%s New %s: %s - %s (%sA)' % (action, p['long_name'], cstart, cend, str(config_period['current'])))
-                        else:
-                            print ('***%s Error: %s' % (p['long_name'], result))
+                        result = solis_control.set_inverter_params(config, session, params, charge=p['charge'], timeslot=p['timeslot'], verbose=args.verbose)
+                        if not args.silent or args.verbose:
+                            if result == 'OK':
+                                print ('***%s New: %s - %s (%sA)' % (p['long_name'], cstart, cend, str(config_period['current'])))
+                            else:
+                                print ('***%s Error: %s' % (p['long_name'], result))
+                                error = True
+            
+            if error is False:          
+                inverter_data = solis_control.get_inverter_data(config, session, verbose=args.verbose)
+                if not args.silent or args.verbose:
+                    if inverter_data:
+                        for p in periods:
+                            existing = common.extract_inverter_params(inverter_data, charge=p['charge'], timeslot=p['timeslot'])
+                            print ('%s: %s - %s (%sA)' % (p['long_name'], existing['start'], existing['end'], existing['amps']))
+                    else:
+                        print ('Error: cannot get inverter data')

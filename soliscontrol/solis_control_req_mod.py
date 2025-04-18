@@ -71,7 +71,7 @@ def get_inverter_entry(config, session):
         
 def get_inverter_detail(config, session): 
     if not config.get('inverter_id'):
-        raise common.SolisControlException('Not connected')
+        raise common.SolisControlException('No inverter id details from connection')
     body = '{"id":"'+config['inverter_id']+'","sn":"'+config['inverter_sn']+'"}'
     header = common.prepare_post_header(config, body, common.DETAIL_ENDPOINT)
     if not config.get('api_url'):
@@ -121,14 +121,14 @@ def get_login_detail(config, session):
     #print(login_detail)
     return login_detail
 
-def set_inverter_params(config, session, params, charge=True, timeslot=0):
+def set_inverter_params(config, session, params, charge=True, timeslot=0, verbose=False):
     # note sets one charge/discharge timeslot - keeps existing inverter data
     # note params is a dict with 'start' (HH:MM), 'end' (HH:MM) and optional 'amps' keys
     # charge should be True for charging, otherwise False for discharging
-    # timeslot can be 0, 1 or 2
+    # timeslot can ONLY be 0, 1 or 2
     if not config.get('login_token'):
         raise common.SolisControlException('Not logged in')
-    check = common.check_all(config) # check time sync and current settings
+    check = common.check_all(config, 2.0) # check current settings and time sync (more time leeway as already connected)
     if check != 'OK':
         return check
     if not config.get('api_url'):
@@ -151,9 +151,11 @@ def set_inverter_params(config, session, params, charge=True, timeslot=0):
         if set_times_msg is not None:
             return set_times_msg
         
-        #print(inverter_data)
+        if verbose: 
+            print ('Inverter data read :', inverter_data)
         inverter_data = common.update_inverter_data(inverter_data, params, charge=charge, timeslot=timeslot)
-        #print(inverter_data)
+        if verbose: 
+            print ('Inverter data write:', inverter_data)
         
         body = common.prepare_body(config, inverter_data)
         headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
@@ -172,10 +174,10 @@ def set_inverter_params(config, session, params, charge=True, timeslot=0):
         set_times_msg = 'Request exception setting charging/discharging times: ' + str(e)
     return set_times_msg
     
-def set_inverter_data(config, session, inverter_data=None):
+def set_inverter_data(config, session, inverter_data=None, verbose=False):
     if not config.get('login_token'):
         raise common.SolisControlException('Not logged in')
-    check = common.check_all(config) # check time sync and current settings
+    check = common.check_all(config, 2.0) # check current settings and time sync (more time leeway as already connected)
     if check != 'OK':
         return check
     if not config.get('api_url'):
@@ -183,6 +185,8 @@ def set_inverter_data(config, session, inverter_data=None):
     set_times_msg = None
     if inverter_data is None:
         inverter_data = common.DEFAULT_INVERTER_DATA
+    if verbose: 
+        print ('Inverter data write:', inverter_data)
     try:
         body = common.prepare_body(config, inverter_data)
         headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
@@ -201,7 +205,7 @@ def set_inverter_data(config, session, inverter_data=None):
         set_times_msg = 'Request exception setting charging/discharging times: ' + str(e)
     return set_times_msg
     
-def get_inverter_data(config, session):
+def get_inverter_data(config, session, verbose=False):
     if not config.get('login_token'):
         raise common.SolisControlException('Not logged in')
     body = common.prepare_body(config)
@@ -223,9 +227,10 @@ def get_inverter_data(config, session):
                 log.warning('HTTP error getting charging/discharging times: %d %s' % (status, response.text))
     except RequestException as e:
         log.warning('Request exception getting charging/discharging times: ' + str(e))
+    if verbose: 
+        print ('Inverter data read :', inverter_data)
     if not inverter_data:
         return None
-    print(inverter_data)
     return inverter_data
         
 def get_inverter_datetime(config, session):
@@ -290,19 +295,23 @@ def set_inverter_datetime(config, session, inverter_datetime=None):
     return set_time_msg
        
 def connect(config, session):
-    if not get_inverter_entry(config, session):
+    try:
+        if not get_inverter_entry(config, session):
+            return False
+        if not get_inverter_detail(config, session):
+            return False
+        if not get_login_detail(config, session):
+            return False
+        get_inverter_datetime(config, session)
+        check = common.check_time(config) # default acceptable time difference = 1 min
+        if check != 'OK':
+            check = set_inverter_datetime(config, session)
+        if check != 'OK':
+            return False
+        return True
+    except common.SolisControlException as e:
+        log.warning('Cannot connect to inverter: %s', str(e))
         return False
-    if not get_inverter_detail(config, session):
-        return False
-    if not get_login_detail(config, session):
-        return False
-    get_inverter_datetime(config, session)
-    check = common.check_time(config) # default acceptable time difference = 1 min
-    if check != 'OK':
-        check = set_inverter_datetime(config, session)
-    if check != 'OK':
-        return False
-    return True
                 
 
         
