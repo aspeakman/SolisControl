@@ -36,7 +36,8 @@ set _Time of Use: Optimal Income_ to _Run_ - see <https://www.youtube.com/watch?
 
 ## Configuration
 
-Put your `secrets.yaml` in the _soliscontrol_ folder then use `example_main.yaml` as a template to create your own `main.yaml` - an example as follows:
+Put your `secrets.yaml` in the _soliscontrol_ folder then use `example_main.yaml` as a template 
+to create a `main.yaml` in the _soliscontrol_ folder too - an example as follows:
 
 ```
 battery_capacity: 7.1 # in kWh - nominal stored energy of battery at 100% SOC (eg 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)

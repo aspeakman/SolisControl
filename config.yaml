@@ -9,6 +9,7 @@ apps:
     forecast_tomorrow: 'solcast_pv_forecast_forecast_tomorrow' # entity id of Solcast tomorrow prediction (kWh) - in 'sensor' domain
     #forecast_multiplier: 1.0 # fixed multiplication factor for solar forecast values (if uncommented, overrides use of 'forecast_tomorrow')
     cron_before: 10 # minutes (default 20) before start of periods below to set charging/discharging times based on target levels
+    #base_reserve_kwh: 1.5 # accessible energy contingency to maintain in the battery (default 15% of 'battery_capacity') 
     solis_control:
       solis_key_secret: !secret solis_key_secret
       solis_key_id: !secret solis_key_id
