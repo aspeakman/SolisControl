@@ -89,6 +89,9 @@ _forecast_remaining_ (optional) remaining forecast solar energy today (kWh) (the
 _cron_before_ The app sets inverter times just before each of the defined charge/discharge periods (see below). It runs _cron_before_ minutes before 
 the start of each period (default 20). 
 
+_base_reserve_kwh_ This is a default energy reserve that the system tries to maintain in the battery as a contingency independently of daily needs 
+(default 15% of _battery_capacity_ see below)
+
 ### solis_control settings
 
 _battery_capacity_ is the nominal stored energy of the battery at 100% State Of Charge (eg 7.1 = 2 * Pylontech US3000C with Nominal Capacity of 3.55 kWh each)
@@ -120,7 +123,7 @@ _solis_station_id_ see `config.yaml` example below
 You can define up to 3 charge and 3 discharge periods (non-overlapping) for your inverter/battery setup (
 _charge_period_, _charge_period2_, _charge_period3_, _discharge_period_, _discharge_period2_ and _discharge_period3_ ).
 
-To set up a period define the _start_ and _end_ times and the _current_ to use in amps. The system will restrict each charge or 
+To set up a period, define the _start_ and _end_ times and the _current_ to use in amps. The system will restrict each charge or 
 discharge episode to within the appropriate start/end period, and it will check the current does not exceed the maxima defined by
 _battery_capacity_, _battery_max_current_ and _inverter_max_current_ (see above)
 
@@ -249,9 +252,11 @@ Some useful services offered by the app:
 
 >_test_solis_flux_times_ which tests the connection to the Solis API and shows notional charge/discharge times for various settings (ignoring solar forecast and current energy)
 
->_check_s3_logger_ which (if configured) tests that the S3 logger is connected and restarts it if necessary
+>_check_logger_ which (if configured) tests that the S3 logger is connected and restarts it if necessary
 
 >_clear_inverter_times_ which clears out any existing scheduled charge/discharge settings
+
+>_set_inverter_times_ which manually sets a defined number of minutes of charging/discharging within a period
 
 >_calc_energy_amp_hour_ which calculates the constant from observed charging/discharging values
 
@@ -259,10 +264,10 @@ Some useful services offered by the app:
 
 Examples of useful entities which are set by the app (depending on the configured charge/discharge periods):
 
->_pyscript.charge_period_times_ = either 'Off' or the currently set #1 charge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
+>_pyscript.charge_period2_forecasts_ = solar forecast energy (kWh) for the rest of the day for the currently set #2 charge period (list of the previous _history_days_ values)
 
->_pyscript.charge_period2_times_ = either 'Off' or the currently set #2 charge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
+>_pyscript.discharge_period_times_ = either 'Off' or the currently set #1 discharge period and current (HH:MM to HH:MM @??A) and when it was set (HH:MM MMM DD)
 
->_pyscript.discharge_period_times_ = either 'Off' or the currently set #1 discharge period and current (HH:MM to HH:MM @??A) and when it was set (YYYY-MM-DD HH:MM)
+>_pyscript.energy_use_history_ = list of daily _energy_monitor_ values (kWh) for the previous _history_days_ period
 
->_pyscript.energy_use_history_ = list of _energy_monitor_ values for the previous _history_days_ period
+>_pyscript.forecast_multiplier_history_ = list of multiplier adjustments to solar forecast for the previous _history_days_ period

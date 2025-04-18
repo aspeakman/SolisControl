@@ -16,29 +16,6 @@ FORECAST_YESTERDAY = 'solar_prediction_yesterday'
 state.persist('pyscript.' + FORECAST_YESTERDAY, default_value='')
 n_history = pyscript.app_config.get('history_days', 7) # number of old solar forecasts/ daily energy use values to store
     
-config = dict(pyscript.app_config['solis_control'])
-cron_before = pyscript.app_config.get('cron_before', 20) # integer
-periods = common.extract_periods(config)
-c_triggers = []; d_triggers = []
-for i in range(3): # default is to never trigger
-    c_triggers.append( { 'cron': 'once(now - 5 min)', 'kwargs': {} } ) 
-    d_triggers.append( { 'cron': 'once(now - 5 min)', 'kwargs': {} } )
-for p in periods:
-    start_hhmm = p['start'] # HH:MM string
-    end_hhmm = p['end'] # HH:MM string
-    p['cron_before'] = p['cron_before'] if p.get('cron_before') else cron_before
-    if start_hhmm != '00:00' or end_hhmm != '00:00':
-        state.persist('pyscript.' + p['name'] + '_forecasts', default_value='')
-        state.persist('pyscript.' + p['name'] + '_times', default_value='')
-        start_time = time.fromisoformat(start_hhmm+':00') # start of period
-        start_time = common.time_adjust(start_time, -p['cron_before']) # time to run before before charge period
-        cron = "cron(%d %d * * *)" % (start_time.minute, start_time.hour)
-        if p['charge']:
-            c_triggers[p['timeslot']] = { 'cron': cron, 'kwargs': p } 
-        else:
-            d_triggers[p['timeslot']] = { 'cron': cron, 'kwargs': p } 
-        log.info("Triggering %s assessment at %s" % (p['long_name'], start_time.strftime("%H:%M")))
-
 log_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s from %s to %s to reach %.1fkWh (%.0f%% SOC)'
 log_off_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> set %s off (%s to %s) because %s'
 log_err_msg = 'Current energy %.1fkWh (%.0f%% SOC) -> error setting %s from %s to %s to reach %.1fkWh (%.0f%% SOC) -> %s'
@@ -84,46 +61,60 @@ def set_flist(list_name, values, maxlen=None, nround=1):
 def get_forecast(period_name=None, save=False):
     # get the solar forecast (in kWh) for the rest of the day (or if not available use average of last n_history)
     forecast = sensor_get(pyscript.app_config['forecast_remaining'])
-    if not period_name:
-        return None if forecast is None else float(forecast) * pyscript.app_config['forecast_multiplier']
-    old_forecasts = period_name+'_forecasts'
-    lf = get_flist(old_forecasts)
-    if forecast is None:
-        forecast = sum(lf) / len(lf) if lf else 0.0 # use average of old forecasts if current solar power forecast not available
-        log.info('Forecast not available - using %.1fkWh (mean of last %d forecasts)', forecast, len(lf))
-    forecast = float(forecast)
-    if forecast and save:
-        lf.append(forecast)         # add new forecast to right side of list
-        set_flist(old_forecasts, lf, n_history)
+    if period_name: # try to use old forecasts which are tied to a specific charge/discharge period
+        old_forecasts = period_name+'_forecasts'
+        lf = get_flist(old_forecasts)
+        if forecast is None:
+            forecast = sum(lf) / len(lf) if lf else 0.0 # use average of old forecasts if current solar power forecast not available
+            log.info('Forecast not available - using %.1fkWh (mean of last %d forecasts)', forecast, len(lf))
+        forecast = float(forecast)
+        if forecast and save:
+            lf.append(forecast)         # add new forecast to right side of list
+            set_flist(old_forecasts, lf, n_history)
+    mtype = None
     if pyscript.app_config.get('forecast_multiplier'):
-        forecast = forecast * pyscript.app_config['forecast_multiplier']
+        mtype = 'fixed multiplier setting'
+        multiplier = pyscript.app_config['forecast_multiplier']
     elif pyscript.app_config.get('forecast_tomorrow'):
         lf = get_flist(FORECAST_MULTIPLIERS)
         if lf:
             multiplier = sum(lf) / len(lf)
-            log.info('Forecast multiplier calculated as %.2f (mean of last %d multipliers)', multiplier, len(lf))
-            forecast = forecast * multiplier
+            mtype = 'mean of last %d multipliers' % len(lf)
+    if mtype and forecast:
+        new_forecast = forecast * multiplier
+        log.info('Forecast %.1fkWh * %.2f (%s) = %.1fkWh' % (forecast, multiplier, mtype, new_forecast))
+        return new_forecast
+    elif forecast:
+        log.info('Forecast %.1fkWh (no multiplier)' % (forecast))
     return forecast
 
-def calc_level(max_required, forecast, period_name, min_required=0.0):
-    # if necessary reduce the required energy level by the predicted solar forecast
-    level = max_required - forecast if forecast else max_required # target energy level in battery to meet requirement
-    level = level if level >= min_required else min_required
-    log.info('Aim %.1fkWh (min %.1fkWh) - solar %s forecast %.1fkWh => target %.1fkWh', max_required, min_required, period_name, forecast, level)
+def calc_level(max_required, forecast, period_name): # find target energy level in battery to meet requirements
+    config = dict(pyscript.app_config['solis_control'])
+    base_reserve = pyscript.app_config.get('base_reserve_kwh', config['battery_capacity'] * 0.15) 
+    # default accessible contingency reserve to always keep in the battery
+    if forecast and forecast > max_required:
+        level = base_reserve
+        log.info('(Aim %.1fkWh < solar %s forecast %.1fkWh) base %.1fkWh = target %.1fkWh', max_required, period_name, forecast, base_reserve, level)
+    elif forecast:
+        level = max_required + base_reserve - forecast
+        log.info('Aim %.1fkWh - solar %s forecast %.1fkWh + base %.1fkWh = target %.1fkWh', max_required, period_name, forecast, base_reserve, level)
+    else:
+        level = max_required + base_reserve 
+        log.info('Aim %.1fkWh + base %.1fkWh = target %.1fkWh', max_required, base_reserve, level)
     return level
     
-def find_requirement(source):
-    required = source.get('kwh_requirement')
-    if required is None:
-        return calc_requirement(source) # see below
-    if not isinstance(required, str):
+def find_requirement(config_period): # find the required charge level
+    required = config_period.get('kwh_requirement') 
+    if required is None: 
+        return calc_requirement(config_period) # if not directly specified, try to calculate from consumption history - see below
+    if not isinstance(required, str): # assume it is directly specified as a number
         return required
-    result = state.get(required)
+    result = state.get(required) # otherwise assume it is specified as a HA entity
     if result in ENTITY_UNAVAILABLE: # includes None
         return -1.0 # do nothing
     return float(result)
     
-def calc_requirement(source): # calculate requirement based on daily consumption (history or specified number)
+def calc_requirement(config_period): # calculate requirement for this config_period based on daily consumption (history or specified number)
     if pyscript.app_config.get('daily_consumption_kwh'):
         req_kwh = pyscript.app_config['daily_consumption_kwh']
         if isinstance(req_kwh, str):
@@ -141,40 +132,31 @@ def calc_requirement(source): # calculate requirement based on daily consumption
             else:
                 return -1.0 # do nothing
         req_kwh = max(lf) # maximum of the stored values
-    start = time.fromisoformat(source['start']+':00')
+    start = time.fromisoformat(config_period['start']+':00')
     prop_remain = (24.0 * 60.0 - (start.hour * 60.0) - start.minute) / (24.0 * 60.0) # proportion of day remaining
     result = req_kwh * prop_remain
-    log.info('Calc requirement at %s -> %.1f * %.0f%% = %.1f' % (source['start'], req_kwh, prop_remain * 100, result))
+    log.info('Calc requirement at %s -> %.1fkWh full day * %.0f%% remaining = %.1fkWh' % (config_period['start'], req_kwh, prop_remain * 100, result))
     return result
 
-@time_trigger(c_triggers[0]['cron'], kwargs=c_triggers[0]['kwargs'])
-@time_trigger(c_triggers[1]['cron'], kwargs=c_triggers[1]['kwargs'])
-@time_trigger(c_triggers[2]['cron'], kwargs=c_triggers[2]['kwargs'])
-@time_trigger(d_triggers[0]['cron'], kwargs=d_triggers[0]['kwargs'])
-@time_trigger(d_triggers[1]['cron'], kwargs=d_triggers[1]['kwargs'])
-@time_trigger(d_triggers[2]['cron'], kwargs=d_triggers[2]['kwargs'])
-def set_charge_discharge_times(**kwargs):
-    if not kwargs:
+# dynamically time triggered just before each period - see create_time_trigger() below
+def set_charge_discharge_times(**config_period):
+    if not config_period:
         return
-    required = find_requirement(kwargs)
-    if required is None or required < 0.0 or (kwargs['start'] == '00:00' and kwargs['end'] == '00:00'):
+    required = find_requirement(config_period)
+    if required is None or required < 0.0 or (config_period['start'] == '00:00' and config_period['end'] == '00:00'):
         return
-    period_name = kwargs['name']
-    min_reserve = required * 0.25
-    forecast = get_forecast(period_name, save=True)
-    level_adjusted = calc_level(required, forecast, period_name, min_reserve)
-    result = set_times(level_adjusted, period_name, charge=kwargs['charge'], timeslot=kwargs['timeslot'])
+    forecast = get_forecast(config_period['name'], save=True)
+    level_adjusted = calc_level(required, forecast, config_period['name'])
+    result = set_times(level_adjusted, config_period)
     if result != 'OK': # handle payload error - "'code': 'B0115'," = the current datalogger is offline or disconnected?
-        task.sleep(kwargs['cron_before'] * 30) # try again once after after half interval
+        task.sleep(config_period['cron_before'] * 30) # try again once after after half interval
         log.info(result + ' - trying again')
-        set_times(level_adjusted, period_name, charge=kwargs['charge'], timeslot=kwargs['timeslot'])
+        set_times(level_adjusted, config_period)
         
-def set_times(level_required, period_name, charge=True, timeslot=0):
+def set_times(level_required, config_period):
     result = 'Cannot connect session'
-    msg_expl = 'already above' if charge else 'already below'
     with solis_control.get_session() as session:
         config = dict(pyscript.app_config['solis_control'])
-        config_period = config[period_name]
         if DATA_LOGGER and config.get(logger.IP_FIELD) and config.get(logger.PASSWORD_FIELD):
             logger.check_logger(config, session) # check if data logger is connected to inverter - if not restart it
         connected = solis_control.connect(config, session)
@@ -182,18 +164,20 @@ def set_times(level_required, period_name, charge=True, timeslot=0):
             eah = config.get('energy_amp_hour')
             unavailable_energy, full_energy, current_energy, real_soc = common.energy_values(config)
             soc = (current_energy + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # state of battery charge
-            if charge:
+            if config_period['charge']:
                 action = 'charge'
+                msg_expl = 'already above'
                 start, end, energy_after = common.charge_times(config_period, full_energy, current_energy, level_required, eah) # charge times to reach ideal energy level
             else:
                 action = 'discharge'
+                msg_expl = 'already below'
                 start, end, energy_after = common.discharge_times(config_period, current_energy, level_required, eah) # discharge times to reach ideal energy level
             start, end = common.limit_times(config_period, start, end)
             after_soc = (energy_after + unavailable_energy) / (full_energy + unavailable_energy) * 100.0 # actual target state of charge
             params = { 'start': start, 'end': end, 'amps': str(config_period['current']) }
-            result = solis_control.set_inverter_params(config, session, params, charge=charge, timeslot=timeslot)
+            result = solis_control.set_inverter_params(config, session, params, charge=config_period['charge'], timeslot=config_period['timeslot']) 
             if result == 'OK':
-                set_times_entity(period_name, start, end, config_period['current'])
+                set_times_entity(config_period, start, end)
                 if start == '00:00' and end == '00:00':
                     log.info(log_off_msg, current_energy, soc, action, start, end, msg_expl)
                 else:
@@ -208,17 +192,20 @@ def set_times(level_required, period_name, charge=True, timeslot=0):
             log.error(result)
     return result
     
-def set_times_entity(period_name, start='00:00', end='00:00', current=None):
+def set_times_entity(config_period, start='00:00', end='00:00'):
     # set entity exposing charge/discharge times after successful setting
-    entity = 'pyscript.' + period_name + '_times'
+    entity = 'pyscript.' + config_period['name'] + '_times'
     if pyscript_get(entity) is not None:
         if start == '00:00' and end == '00:00':
-            value='Off'
+            value = 'Off'
         else: 
             value = start + ' to ' + end
-            if current:
-                value += ' @' + str(current) + 'A'
-        value += datetime.now().strftime(' (set %H:%M %b %d)')
+            value += ' @' + str(config_period['current']) + 'A'
+        if config_period['charge']:
+            value += ' (slot c%d ' % (config_period['timeslot'] + 1)
+        else:
+            value += ' (slot d%d ' % (config_period['timeslot'] + 1)
+        value += datetime.now().strftime('set %H:%M %b %d)')
         state.set(entity, value=value)
             
 @time_trigger("cron(50 23 * * *)")
@@ -273,23 +260,22 @@ fields:
      required: false
 """
     result = { 'status': 'Error', 'message': 'Cannot connect session' }
-    period = None
+    config_period = None
     for p in periods:
         if p['name'] == period_name:
-            period = p
+            config_period = p
             break
-    if not period:
+    if not config_period:
         result['message'] = "Test of solis inverter not possible - invalid period_name '%s' supplied" % period_name
         return result
     with solis_control.get_session() as session:
         config = dict(pyscript.app_config['solis_control'])
-        config_period = config[period_name]
         if DATA_LOGGER and config.get(logger.IP_FIELD) and config.get(logger.PASSWORD_FIELD):
             logger.check_logger(config, session) # check if data logger is connected to inverter - if not restart it
         connected = solis_control.connect(config, session)
         if connected:
             unavailable_energy, full_energy, current_energy, real_soc = common.energy_values(config)
-            current = '(%s-%s at %sA)' % (config_period['start'], config_period['end'],config_period['current'])
+            current = '(%s-%s at %sA)' % (config_period['start'], config_period['end'],str(config_period['current']))
             energy_start = float(starting_level) if starting_level is not None else -1.0
             if period_name.startswith('charge'):
                 energy_start = 0.0 if energy_start < 0.0 or energy_start > full_energy else energy_start
@@ -312,7 +298,7 @@ fields:
             result['message'] = 'Could not connect to Solis API'
     return result
     
-@service("pyscript.check_s3_logger", supports_response="only")
+@service("pyscript.check_logger", supports_response="only")
 def check_logger():
     """yaml
 name: Check logger
@@ -370,7 +356,7 @@ fields:
 @service("pyscript.clear_inverter_times", supports_response="only")
 def clear_inverter_times():
     """yaml
-name: Clear out all charge/discharge times
+name: Clear out all inverter charge/discharge times
 description: Clears out any scheduled charging / discharging times on the inverter
 """
     result = { 'status': 'Error', 'message': 'Cannot connect session' }
@@ -383,8 +369,73 @@ description: Clears out any scheduled charging / discharging times on the invert
                 result['status'] = 'OK'
                 result['message'] = 'Charging/discharging schedule cleared'
                 for p in periods:
-                    set_times_entity(p['name'])
+                    set_times_entity(p['name'], p['timeslot'], p['charge'])
         else:
             result['message'] = 'Could not connect to Solis API'
     return result
+
+@service("pyscript.set_inverter_times", supports_response="only")
+def set_inverter_times(period_name, minutes):
+    """yaml
+name: Set inverter charge/discharge times
+description: Sets scheduled charging / discharging times on the inverter
+fields:
+  period_name:
+     description: name of a configured charge or discharge period
+     example: charge_period
+     required: true
+  minutes:
+     description: duration of the charge or discharge event within the period (mins)
+     example: 30
+     required: true
+"""
+    result = { 'status': 'Error', 'message': 'Cannot connect session' }
+    config_period = None
+    for p in periods:
+        if p['name'] == period_name:
+            config_period = p
+            break
+    if not config_period:
+        result['message'] = "Setting solis inverter times not possible - invalid period_name '%s' supplied" % period_name
+        return result
+    with solis_control.get_session() as session:
+        config = dict(pyscript.app_config['solis_control'])
+        connected = solis_control.connect(config, session)
+        if connected:
+            cstart, cend = common.start_end_from_minutes(config_period, minutes)
+            cstart, cend = common.limit_times(config_period, cstart, cend)
+            params = { 'start': cstart, 'end': cend, 'amps': str(config_period['current']) }
+            result['message'] = solis_control.set_inverter_params(config, session, params, charge=config_period['charge'], timeslot=config_period['timeslot'])
+            if result['message'] == 'OK':
+                set_times_entity(config_period, cstart, cend)
+                result['status'] = 'OK'
+                result['message'] = '%s: set from %s to %s @%sA' % (period_name, cstart, cend, str(config_period['current']))
+        else:
+            result['message'] = 'Could not connect to Solis API'
+    return result
+
+registered_triggers = []   
+def create_time_trigger(time_spec, work_function, kwargs):
+    
+    @time_trigger(time_spec, kwargs=kwargs)
+    def func_trig(**kwargs):
+        work_function(**kwargs)
+
+    registered_triggers.append(func_trig)
+
+config = dict(pyscript.app_config['solis_control'])
+cron_before = pyscript.app_config.get('cron_before', 20) # integer
+periods = common.extract_periods(config, max_three=False) # NB not restricted to time slots 0, 1, 2
+for p in periods:
+    start_hhmm = p['start'] # HH:MM string
+    end_hhmm = p['end'] # HH:MM string
+    p['cron_before'] = p['cron_before'] if p.get('cron_before') else cron_before
+    if start_hhmm != '00:00' or end_hhmm != '00:00':
+        state.persist('pyscript.' + p['name'] + '_forecasts', default_value='')
+        state.persist('pyscript.' + p['name'] + '_times', default_value='')
+        start_time = time.fromisoformat(start_hhmm+':00') # start of period
+        start_time = common.time_adjust(start_time, -p['cron_before']) # time to run before charge/discharge period
+        cron = "cron(%d %d * * *)" % (start_time.minute, start_time.hour)
+        log.info("Triggering %s assessment at %s" % (p['long_name'], start_time.strftime("%H:%M")))
+        create_time_trigger(cron, set_charge_discharge_times, p)     
 
