@@ -6,18 +6,33 @@ battery_max_current: 111 # in amps (eg 74 = 2 * Pylontech US3000C with Recommend
 inverter_max_current: 62.5 # in amps - see inverter datasheet specs for 'Max. charge / discharge current'  (eg 62.5A or 100A)
 charge_period: # Octopus Flux Cheap period when energy can be imported from the grid at low rates
   start: "02:05"
-  end: "04:55" 
-  current: 50 # charge current in amps
-  sync: 'end' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+  end: "02:55" 
+  current: 11 # charge current in amps
+  sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
 charge_period2: # secondary charge period - for topping up battery if necessary at medium rates to avoid importing at subsequent peak rates
-  start: "14:30"
-  end: "15:30" 
-  current: 50 # charge current in amps
-  sync: 'end' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+  start: "03:05"
+  end: "03:55" 
+  current: 12 # charge current in amps
+  sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+charge_period3: # secondary charge period - for topping up battery if necessary at medium rates to avoid importing at subsequent peak rates
+  start: "04:05"
+  end: "04:55" 
+  current: 13 # charge current in amps
+  sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
 discharge_period: # Octopus Flux Peak period when energy can be exported to the grid at high rates
-  start: "16:05"
-  end: "18:55"
-  current: 50 # discharge current in amps
+  start: "05:05"
+  end: "05:55"
+  current: 14 # discharge current in amps
+  sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+discharge_period2: # Octopus Flux Peak period when energy can be exported to the grid at high rates
+  start: "06:05"
+  end: "06:55"
+  current: 15 # discharge current in amps
+  sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
+discharge_period3: # Octopus Flux Peak period when energy can be exported to the grid at high rates
+  start: "07:05"
+  end: "07:55"
+  current: 16 # discharge current in amps
   sync: 'start' # if 'start', charging is tied to start of period or if 'end' it is tied to the end (otherwise it starts randomly)
 
 # optional values
