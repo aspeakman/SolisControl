@@ -76,7 +76,7 @@ after discharging) AND the predicted solar yield for the rest of the day (if the
 _forecast_remaining_ (optional) remaining forecast solar energy today (kWh) (the id of an entity in the 'sensor' domain)
 
 >If you do use a solar forecaster, then the accuracy of any solar predictions can be adjusted, either by a fixed multiplier (_forecast_multiplier_) or by comparing  
->the history of a solar prediction sensor (_forecast_tomorrow_) against actual solar energy yielded (over _history_days_)
+the history of a solar prediction sensor (_forecast_tomorrow_) against actual solar energy yielded (over _history_days_)
 
 >**Either**
 
@@ -193,6 +193,7 @@ apps:
     #forecast_tomorrow: 'energy_production_tomorrow' # entity id of Forecast.Solar tomorrow prediction (kWh) - in 'sensor' domain 
     forecast_multiplier: 1.1 # overrides use of 'forecast_tomorrow'
     cron_before: 10 
+    base_reserve_kwh: 1.5 # accessible energy contingency to maintain in the battery (kWh)
     solis_control:
       solis_key_secret: !secret solis_key_secret
       solis_key_id: !secret solis_key_id

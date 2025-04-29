@@ -62,7 +62,7 @@ As well as _charge_period_ and _discharge_period_ you could also define _charge_
 _discharge_period2_ and _discharge_period3_ in the example above.
 
 ## Actions
-Use the `solis_run.py` module. You should save your `secrets.yaml` in the same folder.
+Use the `solis_run.py` module. You should save your `main.yaml` and `secrets.yaml` in the same folder.
 
 To get help:
 
