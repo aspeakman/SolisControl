@@ -261,6 +261,10 @@ Some useful services offered by the app:
 
 >_calc_energy_amp_hour_ which calculates the constant from observed charging/discharging values
 
+>_set_inverter_slot_ which manually sets an arbitrary charging/discharging timeslot outside the defined periods
+
+>_show_inverter_slots_ which shows all current charging/discharging timeslots
+
 ## Entity States
 
 Examples of useful entities which are set by the app (depending on the configured charge/discharge periods):

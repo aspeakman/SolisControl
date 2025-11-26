@@ -1,4 +1,5 @@
 from datetime import time, date, timedelta, datetime
+import re
 
 import solis_control_req_mod as solis_control
 import solis_common as common
@@ -92,15 +93,15 @@ def calc_level(max_required, forecast, period_name): # find target energy level 
     config = dict(pyscript.app_config['solis_control'])
     base_reserve = pyscript.app_config.get('base_reserve_kwh', config['battery_capacity'] * 0.15) 
     # default accessible contingency reserve to always keep in the battery
-    if forecast and forecast > max_required:
+    level = max_required
+    if forecast:
+        level = max_required - forecast
+    if level < base_reserve:
         level = base_reserve
-        log.info('(Aim %.1fkWh < solar %s forecast %.1fkWh) base %.1fkWh = target %.1fkWh', max_required, period_name, forecast, base_reserve, level)
-    elif forecast:
-        level = max_required + base_reserve - forecast
-        log.info('Aim %.1fkWh - solar %s forecast %.1fkWh + base %.1fkWh = target %.1fkWh', max_required, period_name, forecast, base_reserve, level)
+    if forecast:
+        log.info('Aim %.1fkWh - solar %s forecast %.1fkWh, base %.1fkWh = target %.1fkWh', max_required, period_name, forecast, base_reserve, level)
     else:
-        level = max_required + base_reserve 
-        log.info('Aim %.1fkWh + base %.1fkWh = target %.1fkWh', max_required, base_reserve, level)
+        log.info('Aim %.1fkWh, base %.1fkWh = target %.1fkWh', max_required, base_reserve, level)
     return level
     
 def find_requirement(config_period): # find the required charge level
@@ -256,7 +257,7 @@ fields:
      required: true
   starting_level:
      description: optional starting energy level (kWh)
-     example: 
+     example: 3
      required: false
 """
     result = { 'status': 'Error', 'message': 'Cannot connect session' }
@@ -377,7 +378,7 @@ description: Clears out any scheduled charging / discharging times on the invert
 @service("pyscript.set_inverter_times", supports_response="only")
 def set_inverter_times(period_name, minutes):
     """yaml
-name: Set inverter charge/discharge times
+name: Set inverter charge/discharge times within a defined period
 description: Sets scheduled charging / discharging times on the inverter
 fields:
   period_name:
@@ -410,6 +411,111 @@ fields:
                 set_times_entity(config_period, cstart, cend)
                 result['status'] = 'OK'
                 result['message'] = '%s: set from %s to %s @%sA' % (period_name, cstart, cend, str(config_period['current']))
+        else:
+            result['message'] = 'Could not connect to Solis API'
+    return result
+    
+@service("pyscript.set_inverter_slot", supports_response="only")
+def set_inverter_slot(start=None, end=None, slot=None, amps=None):
+    """yaml
+name: Set/unset inverter charge/discharge time slot
+description: Sets/unsets arbitrary charging/discharging times on the inverter (not restricted by defined periods)
+fields:
+  start:
+     description: start time
+     example: 19:10
+     required: false
+     default: 00:00 (=off)
+  end:
+     description: end time
+     example: 20:10
+     required: false
+     default: 00:00 (=off)
+  slot:
+     description: inverter timeslot to use (c1, c2, c3, d1, d2, d3)
+     example: "c3"
+     required: false
+     default: "c3"
+  amps:
+     description: charge current in amps
+     example: 50
+     required: false
+     default: 50
+"""
+    result = { 'status': 'Error', 'message': 'Cannot connect session' }
+    if start is None: # defaults not taken from function definition in pyscript service call
+        start = '00:00'
+    if end is None:
+        end = '00:00'
+    if slot is None:
+        slot = 'c3'
+    if amps is None:
+        amps = 50
+    hhmm_regex = re.compile(r'([01]\d|20|21|22|23):[0-5]\d$')
+    if hhmm_regex.match(start) and hhmm_regex.match(end):
+        pass
+    else:
+        try: 
+            sdtm = datetime.fromisoformat(start).astimezone() # can be supplied as UTC
+            edtm = datetime.fromisoformat(end).astimezone() # can be supplied as UTC
+            start = sdtm.strftime('%H:%M')
+            end = edtm.strftime('%H:%M')
+        except ValueError:
+            try:
+                stm = time.fromisoformat(start)
+                etm = time.fromisoformat(end)
+                start = stm.strftime('%H:%M')
+                end = etm.strftime('%H:%M')
+            except ValueError:
+                result['message'] = "Setting solis inverter times not possible - invalid start / end times '%s %s' supplied" % (start, end)
+                return result
+    if start > end:
+        result['message'] = "Setting solis inverter times not possible - start time '%s' is after end time '%s'" % (start, end)
+        return result
+    slot = str(slot)
+    if len(slot) == 1:
+        slot = 'c' + slot
+    if slot not in ('c1', 'c2', 'c3', 'd1', 'd2', 'd3'):
+        result['message'] = "Setting solis inverter times not possible - invalid slot '%s' supplied (c/d + 1,2,3 only)" % slot
+        return result
+    charge = True
+    with solis_control.get_session() as session:
+        config = dict(pyscript.app_config['solis_control'])
+        connected = solis_control.connect(config, session)
+        if connected:
+            check = common.check_current(config, amps)
+            if check != 'OK':
+                result['message'] = check
+            else:
+                if slot.startswith('d'):
+                    charge = False
+                timeslot = int(slot[1:]) - 1
+                iparams = { 'start': start, 'end': end, 'amps': str(amps) }
+                result['message'] = solis_control.set_inverter_params(config, session, iparams, charge=charge, timeslot=timeslot)
+                if result['message'] == 'OK':
+                    result['status'] = 'OK'
+                    cdtype = 'Charge' if charge else 'Discharge'
+                    result['message'] = '%s time slot %s: set from %s to %s @ %sA' % (cdtype, slot, start, end, str(amps))
+        else:
+            result['message'] = 'Could not connect to Solis API'
+    return result
+    
+@service("pyscript.show_inverter_slots", supports_response="only")
+def show_inverter_slots():
+    """yaml
+name: Reveal all inverter charge/discharge time slots
+description: Show current charging/discharging times on the inverter
+"""
+    result = { 'status': 'Error', 'message': 'Cannot connect session', 'data': None }
+    with solis_control.get_session() as session:
+        config = dict(pyscript.app_config['solis_control'])
+        connected = solis_control.connect(config, session)
+        if connected:
+            data = solis_control.get_inverter_data(config, session)
+            if data:
+                result['data'] = common.extract_inverter_data(data)
+                result['status'] = 'OK'
+                result['message'] = data
         else:
             result['message'] = 'Could not connect to Solis API'
     return result

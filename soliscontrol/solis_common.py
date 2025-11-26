@@ -130,7 +130,19 @@ def extract_inverter_params(inverter_data, charge=True, timeslot=0):
         return { 'start': ivt[offset+2], 'end': ivt[offset+3], 'amps': ivt[offset+0] }
     else: # discharge
         return { 'start': ivt[offset+4], 'end': ivt[offset+5], 'amps': ivt[offset+1] }
-        
+    
+def extract_inverter_data(inverter_data):
+    # get all entries from the full inverter_data string (which has charge/discharge time and amp settings for 3 time slots)
+    inverter_data = inverter_data.replace('-', ',')
+    ivt = inverter_data.split(',')
+    charge = []
+    discharge = []
+    for timeslot in (0, 1, 2):
+        offset = timeslot * 6
+        charge.append( { 'start': ivt[offset+2], 'end': ivt[offset+3], 'amps': ivt[offset+0] } )
+        discharge.append( { 'start': ivt[offset+4], 'end': ivt[offset+5], 'amps': ivt[offset+1] } )
+    return { 'charge_slots': charge, 'discharge_slots': discharge }   
+    
 def setup_params(config_period, start, end):
     # params dict - limit times and add in amps data
     s, e = limit_times(config_period, start, end)
@@ -312,19 +324,25 @@ def prepare_post_header(config, body, canonicalized_resource):
     }
     return header
                         
-def check_current(config):
+def check_current(config, current=None):
     # current for charging/discharging must be below inverter max and also below battery_max_current
     if not config.get('inverter_power'):
         raise SolisControlException('No inverter power details from connection')
     inverter_max = config['inverter_max_current'] - config['inverter_power']
     battery_max = config['battery_max_current'] - config['inverter_power'] # was config['battery_discharge_max']
-    periods = extract_periods(config, max_three=False)
-    for p in periods:
-        current = p['current']
+    if not current:
+        periods = extract_periods(config, max_three=False)
+        for p in periods:
+            current = p['current']
+            if current > battery_max: 
+                return '%s current %.1fA > battery max %.1fA' % (p['name'], current, battery_max)
+            if current > inverter_max:
+                return '%s current %.1fA > inverter max %.1fA' % (p['name'], current, inverter_max)
+    else:
         if current > battery_max: 
-            return '%s current %.1fA > battery max %.1fA' % (p['name'], current, battery_max)
+            return 'Current %.1fA > battery max %.1fA' % (current, battery_max)
         if current > inverter_max:
-            return '%s current %.1fA > inverter max %.1fA' % (p['name'], current, inverter_max)
+            return 'Current %.1fA > inverter max %.1fA' % (current, inverter_max)
     return 'OK'
     
 def extract_periods(config, max_three=True): # extract configured charge/discharge periods from the config
