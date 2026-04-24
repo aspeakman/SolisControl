@@ -144,15 +144,19 @@ def set_charge_discharge_times(**config_period):
     if not config_period:
         return
     required = find_requirement(config_period)
-    if required is None or required < 0.0 or (config_period['start'] == '00:00' and config_period['end'] == '00:00'):
+    if required is None or required < 0.0 or (config_period['start'] == '00:00' and config_period['end'] == '00:00'): # do nothing
         return
-    forecast = get_forecast(config_period['name'], save=True)
-    level_adjusted = calc_level(required, forecast, config_period['name'])
-    result = set_times(level_adjusted, config_period)
-    if result != 'OK': # handle payload error - "'code': 'B0115'," = the current datalogger is offline or disconnected?
-        task.sleep(config_period['cron_before'] * 30) # try again once after after half interval
-        log.info(result + ' - trying again')
-        set_times(level_adjusted, config_period)
+    if required == 0.0:
+        result = set_inverter_times(config_period['name'], 0)
+        log.info(result)
+    else:
+        forecast = get_forecast(config_period['name'], save=True)
+        level_adjusted = calc_level(required, forecast, config_period['name'])
+        result = set_times(level_adjusted, config_period)
+        if result != 'OK': # handle payload error - "'code': 'B0115'," = the current datalogger is offline or disconnected?
+            task.sleep(config_period['cron_before'] * 30) # try again once after after half interval
+            log.info(result + ' - trying again')
+            set_times(level_adjusted, config_period)
         
 def set_times(level_required, config_period):
     result = 'Cannot connect session'
