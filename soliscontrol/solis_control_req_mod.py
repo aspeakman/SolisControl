@@ -236,7 +236,7 @@ def get_inverter_data(config, session, verbose=False):
 def get_inverter_datetime(config, session):
     if not config.get('login_token'):
         raise common.SolisControlException('Not logged in')
-    body = '{"inverterId":"'+config['inverter_id']+'","cid":"56"}'
+    body = '{"inverterId":"'+config['inverter_id']+'","inverterSn":"'+config['inverter_sn']+'","cid":"56"}'
     headers = common.prepare_post_header(config, body, common.READ_ENDPOINT)
     headers['token']= config['login_token']
     if not config.get('api_url'):
@@ -259,7 +259,6 @@ def get_inverter_datetime(config, session):
         log.warning('Request exception getting inverter time: ' + str(e))
     if not inverter_datetime:
         return None
-    #print(inverter_datetime)
     return inverter_datetime
     
 def set_inverter_datetime(config, session, inverter_datetime=None):
@@ -277,7 +276,7 @@ def set_inverter_datetime(config, session, inverter_datetime=None):
             raise SolisControlException('Bad inverter datetime -> %s' % str(inverter_datetime))
     try:
         value = inverter_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        body = '{"inverterId":"'+config['inverter_id']+'","cid":"56","value":"'+value+'"}'
+        body = '{"inverterId":"'+config['inverter_id']+'","inverterSn":"'+config['inverter_sn']+'","cid":"56","value":"'+value+'"}'
         headers = common.prepare_post_header(config, body, common.CONTROL_ENDPOINT)
         headers['token'] = config['login_token']
         with make_request(session.post, config['api_url']+common.CONTROL_ENDPOINT, data = body, headers = headers) as response:

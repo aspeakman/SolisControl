@@ -94,7 +94,7 @@ def limit_times(config_period, start=None, end=None):
     charge_current = str(config['charge_period']['current'])
     discharge_current = str(config['discharge_period']['current'])
     charge_start, charge_end, discharge_start, discharge_end = limit_times(config, charge_start, charge_end, discharge_start, discharge_end)
-    body = '{"inverterId":"'+config['inverter_id']+'","cid":"103","value":"'
+    body = '{"inverterId":"'+config['inverter_id']+'","inverterSn":"'+config['inverter_sn']+'","cid":"103","value":"'
     body = body+charge_current+","+discharge_current+",%s,%s,%s,%s,"
     body = body+charge_current+","+discharge_current+",00:00,00:00,00:00,00:00,"
     body = body+charge_current+","+discharge_current+",00:00,00:00,00:00,00:00"
@@ -114,9 +114,9 @@ def prepare_body(config, inverter_data=None):
     if inverter_data:
         ivt = validated_inverter_data(inverter_data)
         inverter_data = ','.join(ivt)
-        return '{"inverterId":"'+config['inverter_id']+'","cid":"103","value":"'+inverter_data+'"}'
+        return '{"inverterId":"'+config['inverter_id']+'","inverterSn":"'+config['inverter_sn']+'","cid":"103","value":"'+inverter_data+'"}'
     else:
-        return '{"inverterId":"'+config['inverter_id']+'","cid":"103"}'
+        return '{"inverterId":"'+config['inverter_id']+'","inverterSn":"'+config['inverter_sn']+'","cid":"103"}'
     
 def extract_inverter_params(inverter_data, charge=True, timeslot=0):
     # get one entry from the full inverter_data string (which has charge/discharge time and amp settings for 3 time slots)
